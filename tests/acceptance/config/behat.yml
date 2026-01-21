@@ -1,0 +1,54 @@
+default:
+  autoload:
+     '': '%paths.base%/../features/bootstrap'
+
+  suites:
+    cliEncryption:
+      paths:
+        - '%paths.base%/../features/cliEncryption'
+      contexts:
+        - EncryptionContext:
+        - FeatureContext: &common_feature_context_params
+            baseUrl:  http://localhost:8080
+            adminUsername: admin
+            adminPassword: admin
+            regularUserPassword: 123456
+            ocPath: apps/testing/api/v1/occ
+        - OccContext:
+
+    apiEncryption:
+      paths:
+        - '%paths.base%/../features/apiEncryption'
+      contexts:
+        - EncryptionContext:
+        - FeatureContext: *common_feature_context_params
+        - OccContext:
+        - TrashbinContext:
+
+    webUIUserKeysType:
+      paths:
+        - '%paths.base%/../features/webUIUserKeysType'
+      contexts:
+        - EncryptionContext:
+        - WebUIAdminEncryptionSettingsContext:
+        - WebUIPersonalEncryptionSettingsContext:
+        - WebUIGeneralContext:
+        - WebUILoginContext:
+        - FeatureContext: *common_feature_context_params
+        - OccContext:
+
+    webUIMasterKeyType:
+      paths:
+        - '%paths.base%/../features/webUIMasterKeyType'
+      contexts:
+        - EncryptionContext:
+        - WebUIAdminEncryptionSettingsContext:
+        - WebUIPersonalEncryptionSettingsContext:
+        - WebUIGeneralContext:
+        - WebUILoginContext:
+        - WebUIFilesContext:
+        - FeatureContext: *common_feature_context_params
+        - OccContext:
+
+  extensions:
+    Cjm\Behat\StepThroughExtension: ~

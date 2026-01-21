@@ -1,0 +1,23 @@
+/build/
+/l10n/.transifexrc
+.php_cs.cache
+.php-cs-fixer.cache
+
+# Composer
+vendor/
+vendor-bin/**/vendor
+vendor-bin/**/composer.lock
+
+# Mac OS
+.DS_Store
+
+# Tests - auto-generated files
+/tests/acceptance/output*
+/tests/output
+.phpunit.result.cache
+
+# SonarCloud scanner
+.scannerwork
+
+.idea/
+
