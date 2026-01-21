@@ -1,15 +1,17 @@
 {
   "name": "owncloud/encryption",
+  "description": "ownCloud Default Encryption Module - PHP 8.4 Compatible",
   "config" : {
     "platform": {
-      "php": "7.4"
+      "php": "8.4"
     },
     "allow-plugins": {
       "bamarni/composer-bin-plugin": true
     }
   },
   "require": {
-    "php": ">=7.4"
+    "php": ">=8.4",
+    "ext-openssl": "*"
   },
   "require-dev": {
     "bamarni/composer-bin-plugin": "^1.8"
