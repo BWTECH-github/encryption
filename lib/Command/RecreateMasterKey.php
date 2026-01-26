@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
 * @author Sujith Haridasan <sharidasan@owncloud.com>
 *

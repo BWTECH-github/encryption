@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * @author Björn Schießle <bjoern@schiessle.org>
  * @author Thomas Müller <thomas.mueller@tmit.eu>
