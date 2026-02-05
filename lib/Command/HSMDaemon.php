@@ -1,4 +1,6 @@
 <?php
+
+declare(strict_types=1);
 /**
  * @author Jörn Friedrich Dreyer <jfd@butonic.de>
  *

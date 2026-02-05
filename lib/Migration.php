@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * @author Björn Schießle <bjoern@schiessle.org>
  * @author Joas Schilling <coding@schilljs.com>
@@ -30,17 +33,23 @@ use OCP\IDBConnection;
 use OCP\ILogger;
 
 class Migration {
-	private $moduleId;
-	/** @var \OC\Files\View */
-	private $view;
-	/** @var \OCP\IDBConnection */
-	private $connection;
+	/** @var string */
+	private string $moduleId;
+
+	/** @var View */
+	private View $view;
+
+	/** @var IDBConnection */
+	private IDBConnection $connection;
+
 	/** @var IConfig */
-	private $config;
-	/** @var  ILogger */
-	private $logger;
-	/** @var string*/
-	protected $installedVersion;
+	private IConfig $config;
+
+	/** @var ILogger */
+	private ILogger $logger;
+
+	/** @var string */
+	protected string $installedVersion;
 
 	/**
 	 * @param IConfig $config
@@ -58,7 +67,7 @@ class Migration {
 		$this->installedVersion = $this->config->getAppValue('files_encryption', 'installed_version', '-1');
 	}
 
-	public function finalCleanUp() {
+	public function finalCleanUp(): void {
 		$this->view->deleteAll('files_encryption/public_keys');
 		$this->updateFileCache();
 		$this->config->deleteAppValue('files_encryption', 'installed_version');
@@ -67,7 +76,7 @@ class Migration {
 	/**
 	 * update file cache, copy unencrypted_size to the 'size' column
 	 */
-	private function updateFileCache() {
+	private function updateFileCache(): void {
 		// make sure that we don't update the file cache multiple times
 		// only update during the first run
 		if ($this->installedVersion !== '-1') {
@@ -83,7 +92,7 @@ class Migration {
 	/**
 	 * iterate through users and reorganize the folder structure
 	 */
-	public function reorganizeFolderStructure() {
+	public function reorganizeFolderStructure(): void {
 		$this->reorganizeSystemFolderStructure();
 
 		$limit = 500;
@@ -100,7 +109,7 @@ class Migration {
 	/**
 	 * reorganize system wide folder structure
 	 */
-	public function reorganizeSystemFolderStructure() {
+	public function reorganizeSystemFolderStructure(): void {
 		$this->createPathForKeys('/files_encryption');
 
 		// backup system wide folders
@@ -121,7 +130,7 @@ class Migration {
 	 *
 	 * @param string $user
 	 */
-	public function reorganizeFolderStructureForUser($user) {
+	public function reorganizeFolderStructureForUser(string $user): void {
 		// backup all keys
 		\OC_Util::tearDownFS();
 		\OC_Util::setupFS($user);
@@ -146,7 +155,7 @@ class Migration {
 	/**
 	 * update database
 	 */
-	public function updateDB() {
+	public function updateDB(): void {
 		// make sure that we don't update the file cache multiple times
 		// only update during the first run
 		if ($this->installedVersion === '-1') {
@@ -191,7 +200,7 @@ class Migration {
 	/**
 	 * create backup of system-wide keys
 	 */
-	private function backupSystemWideKeys() {
+	private function backupSystemWideKeys(): void {
 		$backupDir = 'encryption_migration_backup_' . \date("Y-m-d_H-i-s");
 		$this->view->mkdir($backupDir);
 		$this->view->copy('files_encryption', $backupDir . '/files_encryption');
@@ -203,7 +212,7 @@ class Migration {
 	 * @param string $user
 	 * @return bool
 	 */
-	private function backupUserKeys($user) {
+	private function backupUserKeys(string $user): bool {
 		$encryptionDir = $user . '/files_encryption';
 		if ($this->view->is_dir($encryptionDir)) {
 			$backupDir = $user . '/encryption_migration_backup_' . \date("Y-m-d_H-i-s");
@@ -217,10 +226,13 @@ class Migration {
 	/**
 	 * rename system-wide private keys
 	 */
-	private function renameSystemPrivateKeys() {
+	private function renameSystemPrivateKeys(): void {
 		$dh = $this->view->opendir('files_encryption');
 		$this->createPathForKeys('/files_encryption/' . $this->moduleId);
-		if (\is_resource($dh)) {
+
+		// PHP 8.0+ returns Directory object or resource, both work with readdir
+		// Check for false to handle failure case
+		if ($dh !== false) {
 			while (($privateKey = \readdir($dh)) !== false) {
 				if (!\OC\Files\Filesystem::isIgnoredDir($privateKey)) {
 					if (!$this->view->is_dir('/files_encryption/' . $privateKey)) {
@@ -238,9 +250,12 @@ class Migration {
 	 *
 	 * @param string $privateKey private key for which we want to rename the corresponding public key
 	 */
-	private function renameSystemPublicKey($privateKey) {
-		$publicKey = \substr($privateKey, 0, \strrpos($privateKey, '.privateKey')) . '.publicKey';
-		$this->view->rename('files_encryption/public_keys/' . $publicKey, 'files_encryption/' . $this->moduleId . '/' . $publicKey);
+	private function renameSystemPublicKey(string $privateKey): void {
+		$pos = \strrpos($privateKey, '.privateKey');
+		if ($pos !== false) {
+			$publicKey = \substr($privateKey, 0, $pos) . '.publicKey';
+			$this->view->rename('files_encryption/public_keys/' . $publicKey, 'files_encryption/' . $this->moduleId . '/' . $publicKey);
+		}
 	}
 
 	/**
@@ -248,7 +263,7 @@ class Migration {
 	 *
 	 * @param string $user
 	 */
-	private function renameUsersPrivateKey($user) {
+	private function renameUsersPrivateKey(string $user): void {
 		$oldPrivateKey = $user . '/files_encryption/' . $user . '.privateKey';
 		$newPrivateKey = $user . '/files_encryption/' . $this->moduleId . '/' . $user . '.privateKey';
 		if ($this->view->file_exists($oldPrivateKey)) {
@@ -262,7 +277,7 @@ class Migration {
 	 *
 	 * @param string $user
 	 */
-	private function renameUsersPublicKey($user) {
+	private function renameUsersPublicKey(string $user): void {
 		$oldPublicKey = '/files_encryption/public_keys/' . $user . '.publicKey';
 		$newPublicKey = $user . '/files_encryption/' . $this->moduleId . '/' . $user . '.publicKey';
 		if ($this->view->file_exists($oldPublicKey)) {
@@ -278,7 +293,7 @@ class Migration {
 	 * @param string $path
 	 * @param bool $trash
 	 */
-	private function renameFileKeys($user, $path, $trash = false) {
+	private function renameFileKeys(string $user, string $path, bool $trash = false): void {
 		if ($this->view->is_dir($user . '/' . $path) === false) {
 			$this->logger->info('Skip dir /' . $user . '/' . $path . ': does not exist');
 			return;
@@ -286,7 +301,9 @@ class Migration {
 
 		$dh = $this->view->opendir($user . '/' . $path);
 
-		if (\is_resource($dh)) {
+		// PHP 8.0+ returns Directory object or resource, both work with readdir
+		// Check for false to handle failure case
+		if ($dh !== false) {
 			while (($file = \readdir($dh)) !== false) {
 				if (!\OC\Files\Filesystem::isIgnoredDir($file)) {
 					if ($this->view->is_dir($user . '/' . $path . '/' . $file)) {
@@ -317,7 +334,7 @@ class Migration {
 	 * @internal
 	 * @return array
 	 */
-	protected function getSystemMountPoints() {
+	protected function getSystemMountPoints(): array {
 		/** @phan-suppress-next-line PhanDeprecatedFunction */
 		return \OC\Files\External\LegacyUtil::getSystemMountPoints();
 	}
@@ -329,9 +346,9 @@ class Migration {
 	 * @param string $keyPath
 	 * @param string $filename
 	 * @param bool $trash
-	 * @return string|bool
+	 * @return string|false
 	 */
-	private function getTargetDir($user, $keyPath, $filename, $trash) {
+	private function getTargetDir(string $user, string $keyPath, string $filename, bool $trash) {
 		if ($trash) {
 			$filePath = \substr($keyPath, \strlen('/files_trashbin/keys/'));
 			$targetDir = $user . '/files_encryption/keys/files_trashbin/' . $filePath . '/' . $this->moduleId . '/' . $filename;
@@ -364,7 +381,7 @@ class Migration {
 	 *
 	 * @param string $user
 	 */
-	private function deleteOldKeys($user) {
+	private function deleteOldKeys(string $user): void {
 		$this->view->deleteAll($user . '/files_encryption/keyfiles');
 		$this->view->deleteAll($user . '/files_encryption/share-keys');
 	}
@@ -374,7 +391,7 @@ class Migration {
 	 *
 	 * @param string $path
 	 */
-	private function createPathForKeys($path) {
+	private function createPathForKeys(string $path): void {
 		if (!$this->view->file_exists($path)) {
 			$sub_dirs = \explode('/', $path);
 			$dir = '';

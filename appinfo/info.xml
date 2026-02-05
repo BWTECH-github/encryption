@@ -19,7 +19,7 @@
 		<admin>admin-encryption</admin>
 	</documentation>
 	<rememberlogin>false</rememberlogin>
-	<version>1.6.1</version>
+	<version>2.0.0</version>
 	<category>security</category>
 	<types>
 		<filesystem/>
@@ -28,7 +28,7 @@
 	<dependencies>
 		<lib>openssl</lib>
 		<owncloud min-version="10.12" max-version="10"/>
-		<php min-version="7.4" />
+		<php min-version="8.4" />
 	</dependencies>
 	<commands>
 		<command>OCA\Encryption\Command\RecreateMasterKey</command>

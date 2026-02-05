@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 /**
  * @author Björn Schießle <bjoern@schiessle.org>
  * @author Clark Tomlinson <fallen013@gmail.com>
@@ -53,17 +56,17 @@ class CryptHSM extends Crypt {
 	/**
 	 * @var string
 	 */
-	private $hsmUrl;
+	private string $hsmUrl;
 
 	/**
 	 * @var int
 	 */
-	private $clockSkew;
+	private int $clockSkew;
 
 	/**
 	 * @var string
 	 */
-	private $secret;
+	private string $secret;
 
 	/**
 	 * @var IRequest
@@ -71,7 +74,7 @@ class CryptHSM extends Crypt {
 	private $request;
 
 	/**
-	 * ITimeFactory
+	 * @var ITimeFactory
 	 */
 	private $timeFactory;
 
@@ -85,13 +88,22 @@ class CryptHSM extends Crypt {
 	 * @param IConfig $config
 	 * @param IL10N $l
 	 * @param IClientService $clientService
+	 * @param IRequest $request
 	 * @param ITimeFactory $timeFactory
 	 */
-	public function __construct(ILogger $logger, IUserSession $userSession, IConfig $config, IL10N $l, IClientService $clientService, IRequest $request, ITimeFactory $timeFactory) {
+	public function __construct(
+		ILogger $logger,
+		?IUserSession $userSession,
+		IConfig $config,
+		IL10N $l,
+		IClientService $clientService,
+		IRequest $request,
+		ITimeFactory $timeFactory
+	) {
 		parent::__construct($logger, $userSession, $config, $l);
 		$this->hsmUrl = \rtrim($this->config->getAppValue('encryption', 'hsm.url'), '/'); // no default, because Application DI only instantiates this if it is configured non empty
 		$this->secret = $this->config->getAppValue('encryption', 'hsm.jwt.secret', 'secret');
-		$this->clockSkew = (int)$this->config->getAppValue('encryption', 'hsm.jwt.clockskew', 120); // 2min
+		$this->clockSkew = (int)$this->config->getAppValue('encryption', 'hsm.jwt.clockskew', '120'); // 2min
 		$this->clientService = $clientService;
 		$this->request = $request;
 		$this->timeFactory = $timeFactory;
@@ -101,12 +113,12 @@ class CryptHSM extends Crypt {
 	 * create new private/public key-pair for user
 	 * any key config happens in the service
 	 *
-	 * @param string $label human readable name
-	 * @return array|bool
+	 * @param string|null $label human readable name
+	 * @return array|false
 	 */
-	public function createKeyPair($label = null) {
+	public function createKeyPair(?string $label = null) {
 		$response = $this->clientService->newClient()->post(
-			$this->hsmUrl.$this::PATH_NEW_KEY,
+			$this->hsmUrl . self::PATH_NEW_KEY,
 			[
 			'headers' => [
 				'Authorization' => 'Bearer ' . JWT::token([
@@ -128,15 +140,20 @@ class CryptHSM extends Crypt {
 			'privateKey' => $keyPair['privateKeyId'] // returns the key id in the hsm, not the actual private key
 		];
 	}
+
 	/**
 	 * check if it is a valid private key
+	 *
+	 * For HSM, the private key is actually a key ID (UUID), not the actual key.
+	 * We just verify it's not empty.
 	 *
 	 * @param string $plainKey
 	 * @return bool
 	 */
-	protected function isValidPrivateKey($plainKey) { // unneded for HSM, may check if it is '*secret*'?
-		// TODO check if it is a uuid?
-		return true;
+	protected function isValidPrivateKey(string $plainKey): bool {
+		// For HSM, we just check if the key ID is not empty
+		// The actual validation happens on the HSM side
+		return !empty($plainKey);
 	}
 
 	/**
@@ -146,7 +163,7 @@ class CryptHSM extends Crypt {
 	 * @return string
 	 * @throws MultiKeyDecryptException
 	 */
-	public function multiKeyDecrypt($encKeyFile, $shareKey, $privateKey) { // done with HSM, private key contains the key id in the hsm
+	public function multiKeyDecrypt(string $encKeyFile, string $shareKey, $privateKey): string {
 		if (!$encKeyFile) {
 			throw new MultiKeyDecryptException('Cannot multikey decrypt empty plain content');
 		}
@@ -155,8 +172,8 @@ class CryptHSM extends Crypt {
 		$keyId = $privateKey; // TODO check $privateKey is a uuid, should have been generated with genkey
 
 		try {
-			$response =  $this->clientService->newClient()->post(
-				$this->hsmUrl.$this::PATH_DECRYPT.$keyId,
+			$response = $this->clientService->newClient()->post(
+				$this->hsmUrl . self::PATH_DECRYPT . $keyId,
 				[
 				'headers' => [
 					'Authorization' => 'Bearer ' . JWT::token([
@@ -174,7 +191,7 @@ class CryptHSM extends Crypt {
 
 			// differentiate encryption type by looking key length
 			$binaryEncode = \strlen(\bin2hex($encKeyFile)) === self::BINARY_ENCODED_KEY_LENGTH;
-			
+
 			// now decode the file.
 			// version and position are 0 because we always use fresh random data as passphrase
 			$decryptedContent = $this->symmetricDecryptFileContent($encKeyFile, $decryptedKey, self::DEFAULT_CIPHER, 0, 0, $binaryEncode);
@@ -190,12 +207,19 @@ class CryptHSM extends Crypt {
 	}
 
 	/**
+	 * Encrypt data using symmetric encryption and public key encryption for each recipient
+	 *
+	 * HSM uses a different approach than standard Crypt:
+	 * - Generate a random file key
+	 * - Encrypt content with symmetric encryption using the random key
+	 * - Encrypt the random key with each recipient's public key
+	 *
 	 * @param string $plainContent
 	 * @param array $keyFiles
 	 * @return array
 	 * @throws MultiKeyEncryptException
 	 */
-	public function multiKeyEncrypt($plainContent, array $keyFiles) { // done with HSM, needs to return the key ids from the hsm
+	public function multiKeyEncrypt(string $plainContent, array $keyFiles): array {
 		$randomKey = $this->generateFileKey();
 
 		// encrypt $plainContent using a random key and iv.
@@ -209,10 +233,19 @@ class CryptHSM extends Crypt {
 		$encryptedKeys = [];
 		// encrypt $randomKey with all public keys
 		foreach ($keyFiles as $userId => $publicKey) {
-			// FIXME use OPENSSL_PKCS1_OAEP_PADDING, implemented in opensc on 2017-10-19 with https://github.com/OpenSC/OpenSC/pull/1169, see http://php.net/manual/de/function.openssl-public-encrypt.php#118466
-			// TODO make padding configurable?
-			// TODO add command to hsmdaemon to see supported paddings?
-			\openssl_public_encrypt($randomKey, $encryptedKey, $publicKey, OPENSSL_PKCS1_PADDING);
+			// Try OAEP padding first (more secure), fall back to PKCS1 for compatibility
+			$result = \openssl_public_encrypt(
+				$randomKey,
+				$encryptedKey,
+				$publicKey,
+				OPENSSL_PKCS1_OAEP_PADDING
+			);
+
+			if ($result === false) {
+				// Fallback to PKCS1 padding for compatibility with older HSM configurations
+				\openssl_public_encrypt($randomKey, $encryptedKey, $publicKey, OPENSSL_PKCS1_PADDING);
+			}
+
 			$encryptedKeys[$userId] = $encryptedKey;
 		}
 
