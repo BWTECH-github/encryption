@@ -380,6 +380,9 @@ class EncryptAll {
 	 */
 	protected function writePasswordsToFile(array $passwords) {
 		$fp = $this->rootView->fopen('oneTimeEncryptionPasswords.csv', 'w');
+		if (!\is_resource($fp)) {
+			throw new \Exception('Could not open oneTimeEncryptionPasswords.csv for writing');
+		}
 		foreach ($passwords as $pwd) {
 			\fputcsv($fp, $pwd);
 		}

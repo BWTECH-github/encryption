@@ -163,6 +163,11 @@ class FixEncryptedVersion extends Command {
 			 */
 			$handle = $this->view->fopen($path, 'rb');
 
+			if (!\is_resource($handle)) {
+				$output->writeln("<error>Could not open file $path</error>");
+				return false;
+			}
+
 			if (\fread($handle, 9001) !== false) {
 				$output->writeln("<info>The file $path is: OK</info>");
 			}
@@ -171,6 +176,9 @@ class FixEncryptedVersion extends Command {
 
 			return true;
 		} catch (HintException $e) {
+			if (isset($handle) && \is_resource($handle)) {
+				\fclose($handle);
+			}
 			\OC::$server->getLogger()->warning("Issue: " . $e->getMessage());
 			//If allowOnce is set to false, this becomes recursive.
 			if ($ignoreCorrectEncVersionCall === true) {
