@@ -60,7 +60,8 @@ jobs:
           PHP_CS_FIXER_IGNORE_ENV: '1'
         run: |
           vendor-bin/owncloud-codestyle/vendor/bin/php-cs-fixer fix \
-            --dry-run --diff --using-cache=no --show-progress=none
+            --dry-run --diff --allow-risky=yes \
+            --using-cache=no --show-progress=none
 
   integration:
     name: Integration smoke (Core master + sqlite)
