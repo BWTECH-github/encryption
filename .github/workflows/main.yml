@@ -56,6 +56,8 @@ jobs:
         run: composer bin owncloud-codestyle install --no-progress --prefer-dist
 
       - name: Run php-cs-fixer (dry-run)
+        env:
+          PHP_CS_FIXER_IGNORE_ENV: '1'
         run: |
           vendor-bin/owncloud-codestyle/vendor/bin/php-cs-fixer fix \
             --dry-run --diff --using-cache=no --show-progress=none
