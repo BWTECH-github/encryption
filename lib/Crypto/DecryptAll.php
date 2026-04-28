@@ -5,6 +5,8 @@ declare(strict_types=1);
  * @author Björn Schießle <bjoern@schiessle.org>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -35,54 +37,15 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\Question;
 
 class DecryptAll {
-	/** @var Util  */
-	protected $util;
-
-	/** @var QuestionHelper  */
-	protected $questionHelper;
-
-	/** @var EnvironmentHelper  */
-	protected $environmentHelper;
-
-	/** @var  Crypt */
-	protected $crypt;
-
-	/** @var  KeyManager */
-	protected $keyManager;
-
-	/** @var Session  */
-	protected $session;
-
-	/** @var IUserManager */
-	protected $userManager;
-
-	/**
-	 * DecryptAll constructor.
-	 *
-	 * @param Util $util
-	 * @param KeyManager $keyManager
-	 * @param Crypt $crypt
-	 * @param Session $session
-	 * @param IUserManager $userManager
-	 * @param QuestionHelper $questionHelper
-	 * @param EnvironmentHelper $environmentHelper
-	 */
 	public function __construct(
-		Util $util,
-		KeyManager $keyManager,
-		Crypt $crypt,
-		Session $session,
-		IUserManager $userManager,
-		QuestionHelper $questionHelper,
-		EnvironmentHelper $environmentHelper
+		protected readonly Util $util,
+		protected readonly KeyManager $keyManager,
+		protected readonly Crypt $crypt,
+		protected readonly Session $session,
+		protected readonly IUserManager $userManager,
+		protected readonly QuestionHelper $questionHelper,
+		protected readonly EnvironmentHelper $environmentHelper
 	) {
-		$this->util = $util;
-		$this->keyManager = $keyManager;
-		$this->crypt = $crypt;
-		$this->session = $session;
-		$this->userManager = $userManager;
-		$this->questionHelper = $questionHelper;
-		$this->environmentHelper = $environmentHelper;
 	}
 
 	/**
@@ -98,10 +61,9 @@ class DecryptAll {
 	 * @param InputInterface $input
 	 * @param OutputInterface $output
 	 * @param string|null $user The uid of the user ( a non empty string ) for user-keys, or empty or null string for masterkey decryption
-	 * @return bool
 	 * @throws LoginException
 	 */
-	public function prepare(InputInterface $input, OutputInterface $output, $user) {
+	public function prepare(InputInterface $input, OutputInterface $output, ?string $user): bool {
 		// We need to setup the module with everything it needs in order to decrypt user data
 		// This could be using master key or user key encryption
 		// and could also be for a single user or multiple users
@@ -221,12 +183,10 @@ class DecryptAll {
 	/**
 	 * get the private key which will be used to decrypt all files
 	 *
-	 * @param string $user
-	 * @param string $password
 	 * @return bool|string
 	 * @throws \OCA\Encryption\Exceptions\PrivateKeyMissingException
 	 */
-	protected function getPrivateKey($user, $password) {
+	protected function getPrivateKey(string $user, string $password) {
 		$recoveryKeyId = $this->keyManager->getRecoveryKeyId();
 		$masterKeyId = $this->keyManager->getMasterKeyId();
 		if ($user === $recoveryKeyId) {
@@ -243,7 +203,7 @@ class DecryptAll {
 		return $privateKey;
 	}
 
-	protected function updateSession($user, $privateKey) {
+	protected function updateSession(string $user, string $privateKey): void {
 		$this->session->prepareDecryptAll($user, $privateKey);
 	}
 }

@@ -5,6 +5,8 @@ declare(strict_types=1);
  * @author Sujith Haridasan <sharidasan@owncloud.com>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -44,114 +46,36 @@ use OCP\Security\ISecureRandom;
 use Symfony\Component\Console\Helper\QuestionHelper;
 
 class EncDecAllFactory {
-	/** @var Manager  */
-	private $encryptionManager;
-
-	/** @var IUserManager  */
-	private $userManager;
-
-	/** @var ILogger  */
-	private $logger;
-
-	/** @var Util  */
-	private $encUtil;
-
-	/** @var IConfig  */
-	private $config;
-
-	/** @var IMailer  */
-	private $mailer;
-
-	/** @var IL10N  */
-	private $l10n;
-
-	/** @var QuestionHelper  */
-	private $questionHelper;
-
-	/** @var ISecureRandom  */
-	private $secureRandom;
-
-	/** @var IStorage  */
-	private $encStorage;
-
-	/** @var IUserSession  */
-	private $userSession;
-
-	/** @var Session  */
-	private $encSession;
-
-	/** @var CryptHSM  */
-	private $cryptHSM;
-
-	/** @var Crypt  */
-	private $crypt;
-
-	/**
-	 * EncDecAllFactory constructor.
-	 *
-	 * @param Manager $encryptionManager
-	 * @param IUserManager $userManager
-	 * @param ILogger $logger
-	 * @param Util $encUtil
-	 * @param IConfig $config
-	 * @param IMailer $mailer
-	 * @param IL10N $l10n
-	 * @param QuestionHelper $questionHelper
-	 * @param ISecureRandom $secureRandom
-	 * @param IStorage $encStorage
-	 * @param Session $encSession
-	 * @param CryptHSM $cryptHSM
-	 * @param Crypt $crypt
-	 * @param IUserSession $userSession
-	 */
 	public function __construct(
-		Manager $encryptionManager,
-		IUserManager $userManager,
-		ILogger $logger,
-		Util $encUtil,
-		IConfig $config,
-		IMailer $mailer,
-		IL10N $l10n,
-		QuestionHelper $questionHelper,
-		ISecureRandom $secureRandom,
-		IStorage $encStorage,
-		Session $encSession,
-		CryptHSM $cryptHSM,
-		Crypt $crypt,
-		IUserSession $userSession
+		private readonly Manager $encryptionManager,
+		private readonly IUserManager $userManager,
+		private readonly ILogger $logger,
+		private readonly Util $encUtil,
+		private readonly IConfig $config,
+		private readonly IMailer $mailer,
+		private readonly IL10N $l10n,
+		private readonly QuestionHelper $questionHelper,
+		private readonly ISecureRandom $secureRandom,
+		private readonly IStorage $encStorage,
+		private readonly Session $encSession,
+		private readonly CryptHSM $cryptHSM,
+		private readonly Crypt $crypt,
+		private readonly IUserSession $userSession
 	) {
-		$this->encryptionManager = $encryptionManager;
-		$this->userManager = $userManager;
-		$this->logger = $logger;
-		$this->encUtil = $encUtil;
-		$this->config = $config;
-		$this->mailer = $mailer;
-		$this->l10n = $l10n;
-		$this->questionHelper = $questionHelper;
-		$this->secureRandom = $secureRandom;
-		$this->encStorage = $encStorage;
-		$this->encSession = $encSession;
-		$this->cryptHSM = $cryptHSM;
-		$this->crypt = $crypt;
-		$this->userSession = $userSession;
 	}
 
 	/**
 	 * Returns DecryptAll object
-	 *
-	 * @return DecryptAll
 	 */
-	public function getDecryptAllObj() {
+	public function getDecryptAllObj(): DecryptAll {
 		$rootView = new View("/");
 		return new DecryptAll($this->encryptionManager, $this->userManager, $rootView, $this->logger);
 	}
 
 	/**
 	 * Returns EncryptAll object
-	 *
-	 * @return EncryptAll
 	 */
-	public function getEncryptAllObj() {
+	public function getEncryptAllObj(): EncryptAll {
 		$rootView = new View("/");
 
 		/**

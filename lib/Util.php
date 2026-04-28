@@ -7,6 +7,8 @@ declare(strict_types=1);
  * @author Phil Davis <phil.davis@inf.org>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -35,64 +37,24 @@ use OCP\IUserSession;
 use OCP\PreConditionNotMetException;
 
 class Util {
-	/**
-	 * @var View
-	 */
-	private $files;
-	/**
-	 * @var Crypt
-	 */
-	private $crypt;
-	/**
-	 * @var ILogger
-	 */
-	private $logger;
-	/**
-	 * @var bool|IUser
-	 */
+	/** @var bool|IUser */
 	private $user;
-	/**
-	 * @var IConfig
-	 */
-	private $config;
-	/**
-	 * @var IUserManager
-	 */
-	private $userManager;
 
-	/**
-	 * Util constructor.
-	 *
-	 * @param View $files
-	 * @param Crypt $crypt
-	 * @param ILogger $logger
-	 * @param IUserSession $userSession
-	 * @param IConfig $config
-	 * @param IUserManager $userManager
-	 */
 	public function __construct(
-		View $files,
-		Crypt $crypt,
-		ILogger $logger,
-		IUserSession $userSession,
-		IConfig $config,
-		IUserManager $userManager
+		private readonly View $files,
+		private readonly Crypt $crypt,
+		private readonly ILogger $logger,
+		?IUserSession $userSession,
+		private readonly IConfig $config,
+		private readonly IUserManager $userManager
 	) {
-		$this->files = $files;
-		$this->crypt = $crypt;
-		$this->logger = $logger;
 		$this->user = $userSession !== null && $userSession->isLoggedIn() ? $userSession->getUser() : false;
-		$this->config = $config;
-		$this->userManager = $userManager;
 	}
 
 	/**
 	 * check if recovery key is enabled for user
-	 *
-	 * @param string $uid
-	 * @return bool
 	 */
-	public function isRecoveryEnabledForUser($uid) {
+	public function isRecoveryEnabledForUser(string $uid): bool {
 		$recoveryMode = $this->config->getUserValue(
 			$uid,
 			'encryption',
@@ -105,10 +67,8 @@ class Util {
 
 	/**
 	 * check if the home storage should be encrypted
-	 *
-	 * @return bool
 	 */
-	public function shouldEncryptHomeStorage() {
+	public function shouldEncryptHomeStorage(): bool {
 		$encryptHomeStorage = $this->config->getAppValue(
 			'encryption',
 			'encryptHomeStorage',
@@ -120,10 +80,8 @@ class Util {
 
 	/**
 	 * set the home storage encryption on/off
-	 *
-	 * @param bool $encryptHomeStorage
 	 */
-	public function setEncryptHomeStorage($encryptHomeStorage) {
+	public function setEncryptHomeStorage(bool $encryptHomeStorage): void {
 		$value = $encryptHomeStorage ? '1' : '0';
 		$this->config->setAppValue(
 			'encryption',
@@ -134,19 +92,13 @@ class Util {
 
 	/**
 	 * check if master key is enabled
-	 *
-	 * @return bool
 	 */
-	public function isMasterKeyEnabled() {
+	public function isMasterKeyEnabled(): bool {
 		$userMasterKey = $this->config->getAppValue('encryption', 'useMasterKey', '0');
 		return ($userMasterKey === '1');
 	}
 
-	/**
-	 * @param boolean $enabled
-	 * @return bool
-	 */
-	public function setRecoveryForUser($enabled) {
+	public function setRecoveryForUser(bool $enabled): bool {
 		$value = $enabled ? '1' : '0';
 
 		try {
@@ -162,11 +114,7 @@ class Util {
 		}
 	}
 
-	/**
-	 * @param string $uid
-	 * @return bool
-	 */
-	public function userHasFiles($uid) {
+	public function userHasFiles(string $uid): bool {
 		return $this->files->file_exists($uid . '/files');
 	}
 
@@ -174,10 +122,9 @@ class Util {
 	 * get owner from give path, path relative to data/ expected
 	 *
 	 * @param string $path relative to data/
-	 * @return string
 	 * @throws \BadMethodCallException
 	 */
-	public function getOwner($path) {
+	public function getOwner(string $path): string {
 		$owner = '';
 		$parts = \explode('/', $path, 3);
 		if (\count($parts) > 1) {
@@ -194,10 +141,9 @@ class Util {
 	/**
 	 * get storage of path
 	 *
-	 * @param string $path
 	 * @return \OC\Files\Storage\Storage
 	 */
-	public function getStorage($path) {
+	public function getStorage(string $path) {
 		$storage = $this->files->getMount($path)->getStorage();
 		return $storage;
 	}
@@ -205,7 +151,7 @@ class Util {
 	/**
 	 * Deletes the encryption settings for the masterkey
 	 */
-	public function removeEncryptionAppSettings() {
+	public function removeEncryptionAppSettings(): void {
 		$this->config->setAppValue('core', 'encryption_enabled', 'no');
 		$this->config->deleteAppValue('encryption', 'useMasterKey');
 		$this->config->deleteAppValue('encryption', 'masterKeyId');

@@ -8,6 +8,8 @@ declare(strict_types=1);
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -38,74 +40,23 @@ use OCP\Encryption\IFile;
 use OCP\Files\FileInfo;
 
 class Recovery {
-	/**
-	 * @var null|IUser
-	 */
+	/** @var null|IUser|false */
 	protected $user;
-	/**
-	 * @var Crypt
-	 */
-	protected $crypt;
-	/**
-	 * @var ISecureRandom
-	 */
-	private $random;
-	/**
-	 * @var KeyManager
-	 */
-	private $keyManager;
-	/**
-	 * @var IConfig
-	 */
-	private $config;
-	/**
-	 * @var IStorage
-	 */
-	private $keyStorage;
-	/**
-	 * @var View
-	 */
-	private $view;
-	/**
-	 * @var IFile
-	 */
-	private $file;
 
-	/**
-	 * @param IUserSession $user
-	 * @param Crypt $crypt
-	 * @param ISecureRandom $random
-	 * @param KeyManager $keyManager
-	 * @param IConfig $config
-	 * @param IStorage $keyStorage
-	 * @param IFile $file
-	 * @param View $view
-	 */
 	public function __construct(
-		IUserSession $user,
-		Crypt $crypt,
-		ISecureRandom $random,
-		KeyManager $keyManager,
-		IConfig $config,
-		IStorage $keyStorage,
-		IFile $file,
-		View $view
+		?IUserSession $user,
+		protected readonly Crypt $crypt,
+		private readonly ISecureRandom $random,
+		private readonly KeyManager $keyManager,
+		private readonly IConfig $config,
+		private readonly IStorage $keyStorage,
+		private readonly IFile $file,
+		private readonly View $view
 	) {
 		$this->user = ($user !== null && $user->isLoggedIn()) ? $user->getUser() : false;
-		$this->crypt = $crypt;
-		$this->random = $random;
-		$this->keyManager = $keyManager;
-		$this->config = $config;
-		$this->keyStorage = $keyStorage;
-		$this->view = $view;
-		$this->file = $file;
 	}
 
-	/**
-	 * @param string $password
-	 * @return bool
-	 */
-	public function enableAdminRecovery($password) {
+	public function enableAdminRecovery(string $password): bool {
 		$appConfig = $this->config;
 		$keyManager = $this->keyManager;
 
@@ -128,12 +79,8 @@ class Recovery {
 
 	/**
 	 * change recovery key id
-	 *
-	 * @param string $newPassword
-	 * @param string $oldPassword
-	 * @return bool
 	 */
-	public function changeRecoveryKeyPassword($newPassword, $oldPassword) {
+	public function changeRecoveryKeyPassword(string $newPassword, string $oldPassword): bool {
 		$recoveryKey = $this->keyManager->getSystemPrivateKey($this->keyManager->getRecoveryKeyId());
 		$decryptedRecoveryKey = $this->crypt->decryptPrivateKey($recoveryKey, $oldPassword);
 		if ($decryptedRecoveryKey === false) {
@@ -148,11 +95,7 @@ class Recovery {
 		return false;
 	}
 
-	/**
-	 * @param string $recoveryPassword
-	 * @return bool
-	 */
-	public function disableAdminRecovery($recoveryPassword) {
+	public function disableAdminRecovery(string $recoveryPassword): bool {
 		$keyManager = $this->keyManager;
 
 		if ($keyManager->checkRecoveryPassword($recoveryPassword)) {
@@ -167,10 +110,8 @@ class Recovery {
 	 * check if recovery is enabled for user
 	 *
 	 * @param string $user if no user is given we check the current logged-in user
-	 *
-	 * @return bool
 	 */
-	public function isRecoveryEnabledForUser($user = '') {
+	public function isRecoveryEnabledForUser(string $user = ''): bool {
 		$uid = empty($user) ? $this->user->getUID() : $user;
 		$recoveryMode = $this->config->getUserValue(
 			$uid,
@@ -184,20 +125,14 @@ class Recovery {
 
 	/**
 	 * check if recovery is key is enabled by the administrator
-	 *
-	 * @return bool
 	 */
-	public function isRecoveryKeyEnabled() {
+	public function isRecoveryKeyEnabled(): bool {
 		$enabled = $this->config->getAppValue('encryption', 'recoveryAdminEnabled', 0);
 
 		return ($enabled === '1');
 	}
 
-	/**
-	 * @param string $value
-	 * @return bool
-	 */
-	public function setRecoveryForUser($value) {
+	public function setRecoveryForUser(string $value): bool {
 		try {
 			$this->config->setUserValue(
 				$this->user->getUID(),
@@ -220,9 +155,8 @@ class Recovery {
 
 	/**
 	 * add recovery key to all encrypted files
-	 * @param string $path
 	 */
-	private function addRecoveryKeys($path) {
+	private function addRecoveryKeys(string $path): void {
 		$dirContent = $this->view->getDirectoryContent($path);
 		foreach ($dirContent as $item) {
 			if ($this->isSharedStorage($item)) {
@@ -251,9 +185,8 @@ class Recovery {
 
 	/**
 	 * remove recovery key to all encrypted files
-	 * @param string $path
 	 */
-	private function removeRecoveryKeys($path) {
+	private function removeRecoveryKeys(string $path): void {
 		$dirContent = $this->view->getDirectoryContent($path);
 		foreach ($dirContent as $item) {
 			if ($this->isSharedStorage($item)) {
@@ -270,11 +203,8 @@ class Recovery {
 
 	/**
 	 * recover users files with the recovery key
-	 *
-	 * @param string $recoveryPassword
-	 * @param string $user
 	 */
-	public function recoverUsersFiles($recoveryPassword, $user) {
+	public function recoverUsersFiles(string $recoveryPassword, string $user): void {
 		$encryptedKey = $this->keyManager->getSystemPrivateKey($this->keyManager->getRecoveryKeyId());
 
 		$privateKey = $this->crypt->decryptPrivateKey($encryptedKey, $recoveryPassword);
@@ -285,12 +215,8 @@ class Recovery {
 
 	/**
 	 * recover users files
-	 *
-	 * @param string $path
-	 * @param string $privateKey
-	 * @param string $uid
 	 */
-	private function recoverAllFiles($path, $privateKey, $uid) {
+	private function recoverAllFiles(string $path, string $privateKey, string $uid): void {
 		$dirContent = $this->view->getDirectoryContent($path);
 
 		foreach ($dirContent as $item) {
@@ -306,12 +232,8 @@ class Recovery {
 
 	/**
 	 * recover file
-	 *
-	 * @param string $path
-	 * @param string $privateKey
-	 * @param string $uid
 	 */
-	private function recoverFile($path, $privateKey, $uid) {
+	private function recoverFile(string $path, string $privateKey, string $uid): void {
 		$encryptedFileKey = $this->keyManager->getEncryptedFileKey($path);
 		$shareKey = $this->keyManager->getShareKey($path, $this->keyManager->getRecoveryKeyId());
 
@@ -339,11 +261,8 @@ class Recovery {
 
 	/**
 	 * check if the item is on a shared storage
-	 *
-	 * @param FileInfo $item
-	 * @return bool
 	 */
-	protected function isSharedStorage(FileInfo $item) {
+	protected function isSharedStorage(FileInfo $item): bool {
 		/**
 		 * hardcoded class to prevent dependency on files_sharing app and federated share
 		 * TODO: add filter callback to view::getDirectoryContent() or its successor

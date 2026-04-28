@@ -10,6 +10,8 @@ declare(strict_types=1);
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -48,49 +50,18 @@ use OCP\IUserSession;
  * @package OCA\Encryption\Crypto
  */
 class CryptHSM extends Crypt {
-	/**
-	 * @var IClientService
-	 */
-	protected $clientService;
+	protected IClientService $clientService;
 
-	/**
-	 * @var string
-	 */
-	private string $hsmUrl;
-
-	/**
-	 * @var int
-	 */
-	private int $clockSkew;
-
-	/**
-	 * @var string
-	 */
-	private string $secret;
-
-	/**
-	 * @var IRequest
-	 */
-	private $request;
-
-	/**
-	 * @var ITimeFactory
-	 */
-	private $timeFactory;
+	private readonly string $hsmUrl;
+	private readonly int $clockSkew;
+	private readonly string $secret;
+	private IRequest $request;
+	private ITimeFactory $timeFactory;
 
 	public const PATH_NEW_KEY = '/keys/new';
 	public const PATH_DECRYPT = '/decrypt/'; // appended with keyid
 	public const BINARY_ENCODED_KEY_LENGTH = 256;
 
-	/**
-	 * @param ILogger $logger
-	 * @param IUserSession $userSession
-	 * @param IConfig $config
-	 * @param IL10N $l
-	 * @param IClientService $clientService
-	 * @param IRequest $request
-	 * @param ITimeFactory $timeFactory
-	 */
 	public function __construct(
 		ILogger $logger,
 		?IUserSession $userSession,
@@ -116,6 +87,7 @@ class CryptHSM extends Crypt {
 	 * @param string|null $label human readable name
 	 * @return array|false
 	 */
+	#[\Override]
 	public function createKeyPair(?string $label = null) {
 		$response = $this->clientService->newClient()->post(
 			$this->hsmUrl . self::PATH_NEW_KEY,
@@ -146,10 +118,8 @@ class CryptHSM extends Crypt {
 	 *
 	 * For HSM, the private key is actually a key ID (UUID), not the actual key.
 	 * We just verify it's not empty.
-	 *
-	 * @param string $plainKey
-	 * @return bool
 	 */
+	#[\Override]
 	protected function isValidPrivateKey(string $plainKey): bool {
 		// For HSM, we just check if the key ID is not empty
 		// The actual validation happens on the HSM side
@@ -157,12 +127,10 @@ class CryptHSM extends Crypt {
 	}
 
 	/**
-	 * @param string $encKeyFile
-	 * @param string $shareKey
 	 * @param string $privateKey string contains the key uuid in the hsm
-	 * @return string
 	 * @throws MultiKeyDecryptException
 	 */
+	#[\Override]
 	public function multiKeyDecrypt(string $encKeyFile, string $shareKey, $privateKey): string {
 		if (!$encKeyFile) {
 			throw new MultiKeyDecryptException('Cannot multikey decrypt empty plain content');
@@ -214,11 +182,9 @@ class CryptHSM extends Crypt {
 	 * - Encrypt content with symmetric encryption using the random key
 	 * - Encrypt the random key with each recipient's public key
 	 *
-	 * @param string $plainContent
-	 * @param array $keyFiles
-	 * @return array
 	 * @throws MultiKeyEncryptException
 	 */
+	#[\Override]
 	public function multiKeyEncrypt(string $plainContent, array $keyFiles): array {
 		$randomKey = $this->generateFileKey();
 

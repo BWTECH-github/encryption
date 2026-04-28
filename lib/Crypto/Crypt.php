@@ -10,6 +10,8 @@ declare(strict_types=1);
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -88,27 +90,20 @@ class Crypt {
 	public const SEALED_FORMAT_LEGACY = 0x01;
 
 	/**
-	 * @var bool $useLegacyEncoding
 	 * Writing file with legacy base64 encoding is still supported for testing purposes
 	 */
-	private bool $useLegacyEncoding;
+	private readonly bool $useLegacyEncoding;
 
-	/** @var ILogger */
-	protected $logger;
+	protected ILogger $logger;
 
-	/** @var string */
-	private string $user;
+	private readonly string $user;
 
-	/** @var IConfig */
-	protected $config;
+	protected IConfig $config;
 
-	/** @var array */
-	private array $supportedKeyFormats;
+	private readonly array $supportedKeyFormats;
 
-	/** @var IL10N */
-	private $l;
+	private IL10N $l;
 
-	/** @var array */
 	private array $supportedCiphersAndKeySize = [
 		'AES-256-CTR' => 32,
 		'AES-128-CTR' => 16,
@@ -116,12 +111,6 @@ class Crypt {
 		'AES-128-CFB' => 16,
 	];
 
-	/**
-	 * @param ILogger $logger
-	 * @param IUserSession $userSession
-	 * @param IConfig $config
-	 * @param IL10N $l
-	 */
 	public function __construct(ILogger $logger, ?IUserSession $userSession, IConfig $config, IL10N $l) {
 		$this->logger = $logger;
 		$this->user = $userSession !== null && $userSession->isLoggedIn() ? $userSession->getUser()->getUID() : '"no user given"';

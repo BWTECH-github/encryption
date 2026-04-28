@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PHP_VERSION: '8.4'
+  CORE_REPO: BWTECH-github/owncloud.online
+  CORE_REF: main
+  APP_NAME: encryption
+
+jobs:
+  lint-and-style:
+    name: Lint & code style
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: mbstring, openssl, intl, gd, zip, sqlite3, pdo_sqlite
+          tools: composer:v2
+          coverage: none
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer
+          key: ${{ runner.os }}-composer-lint-${{ hashFiles('**/composer.lock', 'vendor-bin/owncloud-codestyle/composer.json') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-lint-
+
+      - name: Install root dependencies
+        run: composer install --no-progress --prefer-dist
+
+      - name: php -l on PHP sources
+        run: |
+          set -e
+          find appinfo lib templates tests -type f -name '*.php' -print0 \
+            | xargs -0 -n1 -P4 php -l > /dev/null
+
+      - name: Install owncloud-codestyle bin
+        run: composer bin owncloud-codestyle install --no-progress --prefer-dist
+
+      - name: Run php-cs-fixer (dry-run)
+        run: |
+          vendor-bin/owncloud-codestyle/vendor/bin/php-cs-fixer fix \
+            --dry-run --diff --using-cache=no --show-progress=none
+
+  integration:
+    name: Integration smoke (Core master + sqlite)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout app
+        uses: actions/checkout@v4
+        with:
+          path: app
+
+      - name: Checkout owncloud.online (Core)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CORE_REPO }}
+          ref: ${{ env.CORE_REF }}
+          path: server
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: mbstring, openssl, intl, gd, zip, sqlite3, pdo_sqlite, ctype, curl, dom, xml, simplexml, fileinfo, bz2, ldap
+          tools: composer:v2
+          coverage: none
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer
+          key: ${{ runner.os }}-composer-integration-${{ hashFiles('app/composer.lock', 'server/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-integration-
+
+      - name: Move app into server/apps
+        run: |
+          mkdir -p server/apps
+          mv app server/apps/${APP_NAME}
+
+      - name: Install Core dependencies
+        working-directory: server
+        run: composer install --no-progress --prefer-dist --no-dev
+
+      - name: Install app dependencies
+        working-directory: server/apps/${{ env.APP_NAME }}
+        run: composer install --no-progress --prefer-dist --no-dev
+
+      - name: Install ownCloud (sqlite)
+        working-directory: server
+        run: |
+          php occ maintenance:install \
+            --database sqlite \
+            --admin-user admin \
+            --admin-pass admin \
+            --data-dir "$PWD/data"
+
+      - name: Enable encryption app
+        working-directory: server
+        run: php occ app:enable ${{ env.APP_NAME }}
+
+      - name: Smoke-check OCC commands
+        working-directory: server
+        run: |
+          set -e
+          OCC_LIST=$(php occ list --no-ansi)
+          echo "$OCC_LIST"
+          for cmd in \
+            encryption:fix-encrypted-version \
+            encryption:hsmdaemon \
+            encryption:hsmdaemon:decrypt \
+            encryption:migrate \
+            encryption:recreate-master-key
+          do
+            if ! echo "$OCC_LIST" | grep -qE "^\s*${cmd}(\s|$)"; then
+              echo "::error::Expected OCC command '${cmd}' not registered"
+              exit 1
+            fi
+            echo "ok: ${cmd}"
+          done

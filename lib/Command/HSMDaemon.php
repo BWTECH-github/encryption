@@ -5,6 +5,8 @@ declare(strict_types=1);
  * @author Jörn Friedrich Dreyer <jfd@butonic.de>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -30,20 +32,14 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class HSMDaemon extends Command {
-	/** @var IConfig */
-	private $config;
-
-	/**
-	 * @param IConfig $config
-	 */
-	public function __construct(IConfig $config) {
-		$this->config = $config;
+	public function __construct(private readonly IConfig $config) {
 		parent::__construct();
 	}
 
 	// TODO add route for hsmdaemon to post current secret
 	// TODO add encrypt masterkey command / as option
-	protected function configure() {
+	#[\Override]
+	protected function configure(): void {
 		$this
 			->setName('encryption:hsmdaemon')
 			->setDescription('hsmdaemon tool');
@@ -62,11 +58,9 @@ class HSMDaemon extends Command {
 	}
 
 	/**
-	 * @param InputInterface $input
-	 * @param OutputInterface $output
-	 * @return int
 	 * @throws \Exception
 	 */
+	#[\Override]
 	protected function execute(InputInterface $input, OutputInterface $output): int {
 		/** @var string|null $hsmUrl */
 		$hsmUrl = $this->config->getAppValue('encryption', 'hsm.url');

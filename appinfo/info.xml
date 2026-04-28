@@ -10,10 +10,12 @@
 		disable the encryption again and switch back to a unencrypted system.
 		Please read the documentation to know all implications before you decide
 		to enable server-side encryption.
+
+		PHP 8.4 fork maintained by BW-Tech GmbH for owncloud.online.
 	</description>
 	<name>Default encryption module</name>
 	<licence>AGPL</licence>
-	<author>Bjoern Schiessle, Clark Tomlinson</author>
+	<author>ownCloud GmbH, modified by BW-Tech GmbH</author>
 	<documentation>
 		<user>user-encryption</user>
 		<admin>admin-encryption</admin>
@@ -21,13 +23,16 @@
 	<rememberlogin>false</rememberlogin>
 	<version>2.0.0</version>
 	<category>security</category>
+	<website>https://bw.tech</website>
+	<bugs>https://github.com/BWTECH-github/owncloud.online/issues</bugs>
+	<repository type="git">https://github.com/BWTECH-github/owncloud.online.git</repository>
 	<types>
 		<filesystem/>
 	</types>
 	<use-migrations>true</use-migrations>
 	<dependencies>
 		<lib>openssl</lib>
-		<owncloud min-version="10.12" max-version="10"/>
+		<owncloud min-version="10.12" max-version="11"/>
 		<php min-version="8.4" />
 	</dependencies>
 	<commands>

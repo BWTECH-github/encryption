@@ -5,6 +5,8 @@ declare(strict_types=1);
  * @author Jörn Friedrich Dreyer <jfd@butonic.de>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -23,24 +25,18 @@ declare(strict_types=1);
 namespace OCA\Encryption;
 
 class JWT {
-	public static function base64UrlEncode($data) {
+	public static function base64UrlEncode(string $data): string {
 		return \str_replace('=', '', \strtr(\base64_encode($data), '+/', '-_'));
 	}
-	/**
-	 * @return string
-	 */
-	public static function header() {
+
+	public static function header(): string {
 		return self::base64UrlEncode(\json_encode([
 			'typ' => 'JWT',
 			'alg' => 'HS256'
 		]));
 	}
 
-	/**
-	 * @param array $payload
-	 * @return string
-	 */
-	public static function payload($payload) {
+	public static function payload(array $payload): string {
 		$payload = \array_merge($payload, [
 			'iat' => \time(),
 			'jti' => \uniqid('', true)
@@ -48,11 +44,11 @@ class JWT {
 		return self::base64UrlEncode(\json_encode($payload));
 	}
 
-	public static function signature($data, $key) {
+	public static function signature(string $data, string $key): string {
 		return self::base64UrlEncode(\hash_hmac('sha256', $data, $key, true));
 	}
 
-	public static function token($payload, $secret) {
+	public static function token(array $payload, string $secret): string {
 		$token = self::header().'.'.self::payload($payload);
 		return $token.'.'.self::signature($token, $secret);
 	}
