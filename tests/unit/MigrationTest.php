@@ -8,7 +8,7 @@
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
  * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
- * 
+ *
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -344,7 +344,7 @@ class MigrationTest extends \Test\TestCase {
 		//$this->invokePrivate($config, 'cache', [[]]);
 		$cache = $this->invokePrivate(\OC::$server->getAppConfig(), 'cache');
 		unset($cache['encryption'], $cache['files_encryption']);
-		
+
 		$this->invokePrivate(\OC::$server->getAppConfig(), 'cache', [$cache]);
 
 		// delete default values set by the encryption app during initialization

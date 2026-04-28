@@ -4,7 +4,7 @@
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
  * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
- * 
+ *
  * @license GPL-2.0
  *
  * This program is free software; you can redistribute it and/or modify it

@@ -6,7 +6,7 @@ declare(strict_types=1);
  * @author PHP 8.4 Migration
  * @copyright Copyright (c) 2024
  * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
- * 
+ *
  * @license AGPL-3.0
  *
  * Tests for backward compatibility with legacy encrypted files
