@@ -6,6 +6,8 @@ declare(strict_types=1);
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -31,59 +33,44 @@ use OCP\IL10N;
 use OCP\IRequest;
 
 class StatusController extends Controller {
-	/** @var IL10N */
-	private $l;
-
-	/** @var Session */
-	private $session;
-
-	/**
-	 * @param string $AppName
-	 * @param IRequest $request
-	 * @param IL10N $l10n
-	 * @param Session $session
-	 */
 	public function __construct(
-		$AppName,
+		string $AppName,
 		IRequest $request,
-		IL10N $l10n,
-		Session $session
+		private readonly IL10N $l,
+		private readonly Session $session
 	) {
 		parent::__construct($AppName, $request);
-		$this->l = $l10n;
-		$this->session = $session;
 	}
 
 	/**
 	 * @NoAdminRequired
-	 * @return DataResponse
 	 */
-	public function getStatus() {
-		$status = 'error';
-		$message = 'no valid init status';
-		switch ($this->session->getStatus()) {
-			case Session::RUN_MIGRATION:
-				$status = 'interactionNeeded';
-				$message = (string)$this->l->t(
+	public function getStatus(): DataResponse {
+		[$status, $message] = match ($this->session->getStatus()) {
+			Session::RUN_MIGRATION => [
+				'interactionNeeded',
+				(string)$this->l->t(
 					'You need to migrate your encryption keys from the old encryption (ownCloud <= 8.0) to the new one. Please run \'occ encryption:migrate\' or contact your administrator'
-				);
-				break;
-			case Session::INIT_EXECUTED:
-				$status = 'interactionNeeded';
-				$message = (string)$this->l->t(
+				),
+			],
+			Session::INIT_EXECUTED => [
+				'interactionNeeded',
+				(string)$this->l->t(
 					'Invalid private key for Encryption App. Please update your private key password in your personal settings to recover access to your encrypted files.'
-				);
-				break;
-			case Session::NOT_INITIALIZED:
-				$status = 'interactionNeeded';
-				$message = (string)$this->l->t(
+				),
+			],
+			Session::NOT_INITIALIZED => [
+				'interactionNeeded',
+				(string)$this->l->t(
 					'Encryption App is enabled, but your keys are not initialized. Please log-out and log-in again.'
-				);
-				break;
-			case Session::INIT_SUCCESSFUL:
-				$status = 'success';
-				$message = (string)$this->l->t('Encryption App is enabled and ready');
-		}
+				),
+			],
+			Session::INIT_SUCCESSFUL => [
+				'success',
+				(string)$this->l->t('Encryption App is enabled and ready'),
+			],
+			default => ['error', 'no valid init status'],
+		};
 
 		return new DataResponse(
 			[

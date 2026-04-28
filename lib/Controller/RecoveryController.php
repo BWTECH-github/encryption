@@ -7,6 +7,8 @@ declare(strict_types=1);
  * @author Lukas Reschke <lukas@statuscode.ch>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -34,46 +36,22 @@ use OCP\IRequest;
 use OCP\AppFramework\Http\DataResponse;
 
 class RecoveryController extends Controller {
-	/**
-	 * @var IConfig
-	 */
-	private $config;
-	/**
-	 * @var IL10N
-	 */
-	private $l;
-	/**
-	 * @var Recovery
-	 */
-	private $recovery;
-
-	/**
-	 * @param string $AppName
-	 * @param IRequest $request
-	 * @param IConfig $config
-	 * @param IL10N $l10n
-	 * @param Recovery $recovery
-	 */
 	public function __construct(
-		$AppName,
+		string $AppName,
 		IRequest $request,
-		IConfig $config,
-		IL10N $l10n,
-		Recovery $recovery
+		private readonly IConfig $config,
+		private readonly IL10N $l,
+		private readonly Recovery $recovery
 	) {
 		parent::__construct($AppName, $request);
-		$this->config = $config;
-		$this->l = $l10n;
-		$this->recovery = $recovery;
 	}
 
 	/**
 	 * @param string $recoveryPassword
 	 * @param string $confirmPassword
 	 * @param string $adminEnableRecovery
-	 * @return DataResponse
 	 */
-	public function adminRecovery($recoveryPassword, $confirmPassword, $adminEnableRecovery) {
+	public function adminRecovery($recoveryPassword, $confirmPassword, $adminEnableRecovery): DataResponse {
 		// Check if both passwords are the same
 		if (empty($recoveryPassword)) {
 			$errorMessage = (string)$this->l->t('Missing recovery key password');
@@ -118,9 +96,8 @@ class RecoveryController extends Controller {
 	 * @param string $newPassword
 	 * @param string $oldPassword
 	 * @param string $confirmPassword
-	 * @return DataResponse
 	 */
-	public function changeRecoveryPassword($newPassword, $oldPassword, $confirmPassword) {
+	public function changeRecoveryPassword($newPassword, $oldPassword, $confirmPassword): DataResponse {
 		//check if both passwords are the same
 		if (empty($oldPassword)) {
 			$errorMessage = (string)$this->l->t('Please provide the old recovery password');
@@ -169,9 +146,8 @@ class RecoveryController extends Controller {
 	 * @NoAdminRequired
 	 *
 	 * @param string $userEnableRecovery
-	 * @return DataResponse
 	 */
-	public function userSetRecovery($userEnableRecovery) {
+	public function userSetRecovery($userEnableRecovery): DataResponse {
 		if ($userEnableRecovery === '0' || $userEnableRecovery === '1') {
 			$result = $this->recovery->setRecoveryForUser($userEnableRecovery);
 
