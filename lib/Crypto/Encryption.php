@@ -11,6 +11,8 @@ declare(strict_types=1);
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -46,58 +48,17 @@ class Encryption implements IEncryptionModule {
 	public const ID = 'OC_DEFAULT_MODULE';
 	public const DISPLAY_NAME = 'Default encryption module';
 
-	/**
-	 * @var Crypt
-	 */
-	private Crypt $crypt;
-
-	/** @var string */
 	private string $cipher = '';
-
-	/** @var string */
 	private string $path = '';
-
-	/** @var string */
 	private string $user = '';
-
-	/** @var string */
 	private string $fileKey = '';
-
-	/** @var string */
 	private string $writeCache = '';
-
-	/** @var KeyManager */
-	private KeyManager $keyManager;
-
-	/** @var array */
 	private array $accessList = [];
-
-	/** @var bool */
 	private bool $isWriteOperation = false;
-
-	/** @var Util */
-	private Util $util;
-
-	/** @var Session */
-	private Session $session;
-
-	/** @var ILogger */
-	private ILogger $logger;
-
-	/** @var IL10N */
 	private IL10N $l;
-
-	/** @var EncryptAll */
-	private EncryptAll $encryptAll;
-
-	/** @var bool */
-	private bool $useMasterPassword;
-
-	/** @var DecryptAll */
-	private DecryptAll $decryptAll;
+	private readonly bool $useMasterPassword;
 
 	/**
-	 * @var bool $useLegacyEncoding
 	 * In write operation, it is equal to crypt->useLegacyEncoding(),
 	 * In read operation, it is false if header contains "encoding:binary" otherwise true.
 	 */
@@ -109,34 +70,16 @@ class Encryption implements IEncryptionModule {
 	/** @var array remember encryption signature version */
 	private static array $rememberVersion = [];
 
-	/**
-	 *
-	 * @param Crypt $crypt
-	 * @param KeyManager $keyManager
-	 * @param Util $util
-	 * @param Session $session
-	 * @param EncryptAll $encryptAll
-	 * @param DecryptAll $decryptAll
-	 * @param ILogger $logger
-	 * @param IL10N $il10n
-	 */
 	public function __construct(
-		Crypt $crypt,
-		KeyManager $keyManager,
-		Util $util,
-		Session $session,
-		EncryptAll $encryptAll,
-		DecryptAll $decryptAll,
-		ILogger $logger,
+		private readonly Crypt $crypt,
+		private readonly KeyManager $keyManager,
+		private readonly Util $util,
+		private readonly Session $session,
+		private readonly EncryptAll $encryptAll,
+		private readonly DecryptAll $decryptAll,
+		private readonly ILogger $logger,
 		IL10N $il10n
 	) {
-		$this->crypt = $crypt;
-		$this->keyManager = $keyManager;
-		$this->util = $util;
-		$this->session = $session;
-		$this->encryptAll = $encryptAll;
-		$this->decryptAll = $decryptAll;
-		$this->logger = $logger;
 		$this->l = $il10n;
 		$this->useMasterPassword = $util->isMasterKeyEnabled();
 	}
@@ -144,15 +87,15 @@ class Encryption implements IEncryptionModule {
 	/**
 	 * @return string defining the technical unique id
 	 */
+	#[\Override]
 	public function getId(): string {
 		return self::ID;
 	}
 
 	/**
 	 * In comparison to getKey() this function returns a human readable (maybe translated) name
-	 *
-	 * @return string
 	 */
+	#[\Override]
 	public function getDisplayName(): string {
 		return self::DISPLAY_NAME;
 	}
@@ -174,6 +117,7 @@ class Encryption implements IEncryptionModule {
 	 *                       written to the header, in case of a write operation
 	 *                       or if no additional data is needed return a empty array
 	 */
+	#[\Override]
 	public function begin($path, $user, $mode, array $header, array $accessList, $sourceFileOfRename = null): array {
 		$this->path = $this->getPathToRealFile($path);
 		$this->accessList = $accessList;
@@ -257,6 +201,7 @@ class Encryption implements IEncryptionModule {
 	 * @throws \Exception
 	 * @throws \OCA\Encryption\Exceptions\MultiKeyEncryptException
 	 */
+	#[\Override]
 	public function end($path, $position = 0): string {
 		$result = '';
 		if ($this->isWriteOperation) {
@@ -309,6 +254,7 @@ class Encryption implements IEncryptionModule {
 	 * @param int|string $position
 	 * @return string encrypted data
 	 */
+	#[\Override]
 	public function encrypt($data, $position = 0): string {
 		// If extra data is left over from the last round, make sure it
 		// is integrated into the next block
@@ -370,6 +316,7 @@ class Encryption implements IEncryptionModule {
 	 * @return string decrypted data
 	 * @throws DecryptionFailedException
 	 */
+	#[\Override]
 	public function decrypt($data, $position = 0): string {
 		if (empty($this->fileKey)) {
 			$msg = 'Can not decrypt this file, probably this is a shared file. Please ask the file owner to reshare the file with you.';
@@ -390,6 +337,7 @@ class Encryption implements IEncryptionModule {
 	 * @param array $accessList who has access to the file contains the key 'users' and 'public'
 	 * @return bool|void
 	 */
+	#[\Override]
 	public function update($path, $uid, array $accessList) {
 		if (empty($accessList)) {
 			if (isset(self::$rememberVersion[$path])) {
@@ -440,6 +388,7 @@ class Encryption implements IEncryptionModule {
 	 * @param string $path
 	 * @return bool
 	 */
+	#[\Override]
 	public function shouldEncrypt($path): bool {
 		if ($this->util->shouldEncryptHomeStorage() === false) {
 			$storage = $this->util->getStorage($path);
@@ -481,6 +430,7 @@ class Encryption implements IEncryptionModule {
 	 * @param bool $signed
 	 * @return int
 	 */
+	#[\Override]
 	public function getUnencryptedBlockSize($signed = false): int {
 		$unencryptedBlockSize = 8168;
 		if ($signed === true) {
@@ -503,6 +453,7 @@ class Encryption implements IEncryptionModule {
 	 * @return bool
 	 * @throws DecryptionFailedException
 	 */
+	#[\Override]
 	public function isReadable($path, $uid): bool {
 		$fileKey = $this->keyManager->getFileKey($path, $uid);
 		if (empty($fileKey)) {
@@ -530,6 +481,7 @@ class Encryption implements IEncryptionModule {
 	 * @param InputInterface $input
 	 * @param OutputInterface $output write some status information to the terminal during encryption
 	 */
+	#[\Override]
 	public function encryptAll(InputInterface $input, OutputInterface $output): void {
 		$this->encryptAll->encryptAll($input, $output);
 	}
@@ -542,6 +494,7 @@ class Encryption implements IEncryptionModule {
 	 * @param string $user
 	 * @return bool
 	 */
+	#[\Override]
 	public function prepareDecryptAll(InputInterface $input, OutputInterface $output, $user = ''): bool {
 		return $this->decryptAll->prepare($input, $output, $user);
 	}
@@ -598,6 +551,7 @@ class Encryption implements IEncryptionModule {
 	 * @return bool
 	 * @since 9.1.0
 	 */
+	#[\Override]
 	public function isReadyForUser($user): bool {
 		if ($this->util->isMasterKeyEnabled() === true) {
 			return true;

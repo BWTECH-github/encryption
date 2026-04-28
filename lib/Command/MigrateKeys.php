@@ -6,6 +6,8 @@ declare(strict_types=1);
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -37,40 +39,18 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class MigrateKeys extends Command {
-	/** @var IUserManager */
-	private $userManager;
-	/** @var View */
-	private $view;
-	/** @var IDBConnection */
-	private $connection;
-	/** @var IConfig */
-	private $config;
-	/** @var  ILogger */
-	private $logger;
-
-	/**
-	 * @param IUserManager $userManager
-	 * @param View $view
-	 * @param IDBConnection $connection
-	 * @param IConfig $config
-	 * @param ILogger $logger
-	 */
 	public function __construct(
-		IUserManager $userManager,
-		View $view,
-		IDBConnection $connection,
-		IConfig $config,
-		ILogger $logger
+		private readonly IUserManager $userManager,
+		private readonly View $view,
+		private readonly IDBConnection $connection,
+		private readonly IConfig $config,
+		private readonly ILogger $logger
 	) {
-		$this->userManager = $userManager;
-		$this->view = $view;
-		$this->connection = $connection;
-		$this->config = $config;
-		$this->logger = $logger;
 		parent::__construct();
 	}
 
-	protected function configure() {
+	#[\Override]
+	protected function configure(): void {
 		$this
 			->setName('encryption:migrate')
 			->setDescription('initial migration to encryption 2.0')
@@ -81,11 +61,7 @@ class MigrateKeys extends Command {
 			);
 	}
 
-	/**
-	 * @param InputInterface $input
-	 * @param OutputInterface $output
-	 * @return int
-	 */
+	#[\Override]
 	protected function execute(InputInterface $input, OutputInterface $output): int {
 		// perform system reorganization
 		$migration = new Migration($this->config, $this->view, $this->connection, $this->logger);

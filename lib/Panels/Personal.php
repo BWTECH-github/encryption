@@ -5,6 +5,8 @@ declare(strict_types=1);
  * @author Tom Needham <tom@owncloud.com>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -33,50 +35,31 @@ use OCP\Settings\ISettings;
 use OCP\Template;
 
 class Personal implements ISettings {
-	/** @var ILogger */
-	protected $logger;
-	/** @var IUserSession */
-	protected $userSession;
-	/** @var IConfig */
-	protected $config;
-	/** @var IL10N */
-	protected $l;
-	/** @varIUserManager */
-	protected $userManager;
-	/** @var ISession  */
-	protected $session;
-	/** @var IStorage */
-	protected $encKeyStorage;
-
 	public function __construct(
-		ILogger $logger,
-		IUserSession $userSession,
-		IConfig $config,
-		IL10N $l,
-		IUserManager $userManager,
-		ISession $session,
-		IStorage $encKeyStorage
+		protected readonly ILogger $logger,
+		protected readonly IUserSession $userSession,
+		protected readonly IConfig $config,
+		protected readonly IL10N $l,
+		protected readonly IUserManager $userManager,
+		protected readonly ISession $session,
+		protected readonly IStorage $encKeyStorage
 	) {
-		$this->logger = $logger;
-		$this->userSession = $userSession;
-		$this->config = $config;
-		$this->l = $l;
-		$this->userManager = $userManager;
-		$this->session = $session;
-		$this->encKeyStorage = $encKeyStorage;
 	}
 
-	public function getPriority() {
+	#[\Override]
+	public function getPriority(): int {
 		return 0;
 	}
 
-	public function getSectionID() {
+	#[\Override]
+	public function getSectionID(): string {
 		return 'encryption';
 	}
 
 	/**
 	 * @return \OCP\AppFramework\Http\TemplateResponse|Template|null
 	 */
+	#[\Override]
 	public function getPanel() {
 		$session = new \OCA\Encryption\Session($this->session);
 		$template = new Template('encryption', 'settings-personal');

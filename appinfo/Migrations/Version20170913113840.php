@@ -3,6 +3,8 @@
  * @author Sujith Haridasan <sharidasan@owncloud.com>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -25,10 +27,8 @@ use OCP\Migration\ISimpleMigration;
 use OCP\Migration\IOutput;
 
 class Version20170913113840 implements ISimpleMigration {
-	/**
-	 * @param IOutput $out
-	*/
-	public function run(IOutput $out) {
+	#[\Override]
+	public function run(IOutput $out): void {
 		$installedVersion = \OC::$server->getConfig()->getSystemValue('version', '0.0.0');
 
 		if (\version_compare('10.0.3', $installedVersion, '>=') === true) {

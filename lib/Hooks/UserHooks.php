@@ -8,6 +8,8 @@ declare(strict_types=1);
  * @author Vincent Petry <pvince81@owncloud.com>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -43,98 +45,26 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\EventDispatcher\GenericEvent;
 
 class UserHooks implements IHook {
-	/**
-	 * @var KeyManager
-	 */
-	private $keyManager;
-	/**
-	 * @var IUserManager
-	 */
-	private $userManager;
-	/**
-	 * @var ILogger
-	 */
-	private $logger;
-	/**
-	 * @var Setup
-	 */
-	private $userSetup;
-	/**
-	 * @var IUserSession
-	 */
-	private $user;
-	/**
-	 * @var Util
-	 */
-	private $util;
-	/**
-	 * @var Session
-	 */
-	private $session;
-	/**
-	 * @var Recovery
-	 */
-	private $recovery;
-	/**
-	 * @var Crypt
-	 */
-	private $crypt;
-	/**
-	 * @var IConfig
-	 */
-	private $config;
-	/**
-	 * @var EventDispatcherInterface
-	 */
-	private $eventDispatcher;
-
-	/**
-	 * UserHooks constructor.
-	 *
-	 * @param KeyManager $keyManager
-	 * @param IUserManager $userManager
-	 * @param ILogger $logger
-	 * @param Setup $userSetup
-	 * @param IUserSession $user
-	 * @param Util $util
-	 * @param Session $session
-	 * @param Crypt $crypt
-	 * @param Recovery $recovery
-	 * @param IConfig $config
-	 * @param EventDispatcherInterface $eventDispatcher
-	 */
 	public function __construct(
-		KeyManager $keyManager,
-		IUserManager $userManager,
-		ILogger $logger,
-		Setup $userSetup,
-		IUserSession $user,
-		Util $util,
-		Session $session,
-		Crypt $crypt,
-		Recovery $recovery,
-		IConfig $config,
-		EventDispatcherInterface $eventDispatcher
+		private readonly KeyManager $keyManager,
+		private readonly IUserManager $userManager,
+		private readonly ILogger $logger,
+		private readonly Setup $userSetup,
+		private readonly IUserSession $user,
+		private readonly Util $util,
+		private readonly Session $session,
+		private readonly Crypt $crypt,
+		private readonly Recovery $recovery,
+		private readonly IConfig $config,
+		private readonly EventDispatcherInterface $eventDispatcher
 	) {
-		$this->keyManager = $keyManager;
-		$this->userManager = $userManager;
-		$this->logger = $logger;
-		$this->userSetup = $userSetup;
-		$this->user = $user;
-		$this->util = $util;
-		$this->session = $session;
-		$this->recovery = $recovery;
-		$this->crypt = $crypt;
-		$this->config = $config;
-		$this->eventDispatcher = $eventDispatcher;
 	}
 
 	/**
 	 * Connects Hooks
-	 *
-	 * @return void|null
 	 */
-	public function addHooks() {
+	#[\Override]
+	public function addHooks(): void {
 		$this->eventDispatcher->addListener('user.afterlogin', [$this, 'login']);
 		$this->eventDispatcher->addListener('user.beforelogout', [$this, 'logout']);
 
@@ -151,7 +81,6 @@ class UserHooks implements IHook {
 	 * Startup encryption backend upon user login
 	 *
 	 * @note This method should never be called for users using client side encryption
-	 * @param GenericEvent $params
 	 * @return boolean|null|void
 	 */
 	public function login(GenericEvent $params) {
@@ -173,7 +102,7 @@ class UserHooks implements IHook {
 	/**
 	 * remove keys from session during logout
 	 */
-	public function logout() {
+	public function logout(): void {
 		$this->session->clear();
 	}
 
@@ -181,10 +110,8 @@ class UserHooks implements IHook {
 	 * setup encryption backend upon user created
 	 *
 	 * @note This method should never be called for users using client side encryption
-	 * @param GenericEvent $params
-	 * @return void
 	 */
-	public function postCreateUser($params) {
+	public function postCreateUser(GenericEvent $params): void {
 		if (App::isEnabled('encryption')) {
 			$this->userSetup->setupUser($params->getArgument('uid'), $params->getArgument('password'));
 		}
@@ -194,10 +121,8 @@ class UserHooks implements IHook {
 	 * cleanup encryption backend upon user deleted
 	 *
 	 * @note This method should never be called for users using client side encryption
-	 * @param GenericEvent $params
-	 * @return void
 	 */
-	public function postDeleteUser(GenericEvent $params) {
+	public function postDeleteUser(GenericEvent $params): void {
 		if (App::isEnabled('encryption')) {
 			/**
 			 * Adding a safe condition to make sure the uid is not
@@ -214,9 +139,8 @@ class UserHooks implements IHook {
 	 * If the password can't be changed within ownCloud, than update the key password in advance.
 	 *
 	 * @param GenericEvent $params : uid, password
-	 * @return void
 	 */
-	public function preSetPassphrase(GenericEvent $params) {
+	public function preSetPassphrase(GenericEvent $params): void {
 		if (App::isEnabled('encryption')) {
 			$user = $params->getArgument('user');
 			if ($user && !$user->canChangePassword()) {
@@ -229,9 +153,8 @@ class UserHooks implements IHook {
 	 * Change a user's encryption passphrase
 	 *
 	 * @param GenericEvent $params keys: uid, password
-	 * @return void
 	 */
-	public function setPassphrase(GenericEvent $params) {
+	public function setPassphrase(GenericEvent $params): void {
 		$privateKey = null;
 		$user = null;
 		$userFromParams = $params->getArgument('user');
@@ -305,19 +228,16 @@ class UserHooks implements IHook {
 	/**
 	 * init mount points for given user
 	 *
-	 * @param string $user
 	 * @throws \OC\User\NoUserException
 	 */
-	protected function initMountPoints($user) {
+	protected function initMountPoints(string $user): void {
 		Filesystem::initMountPoints($user);
 	}
 
 	/**
 	 * after password reset we create a new key pair for the user
-	 *
-	 * @param array $params
 	 */
-	public function postPasswordReset($params) {
+	public function postPasswordReset(array $params): void {
 		$password = $params['password'];
 
 		$this->keyManager->deleteUserKeys($params['uid']);
@@ -329,7 +249,7 @@ class UserHooks implements IHook {
 	 *
 	 * @param string $uid user id
 	 */
-	protected function setupFS($uid) {
+	protected function setupFS(string $uid): void {
 		\OC_Util::setupFS($uid);
 	}
 }

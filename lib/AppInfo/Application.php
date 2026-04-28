@@ -7,6 +7,8 @@ declare(strict_types=1);
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -50,8 +52,7 @@ use OCP\IConfig;
 use Symfony\Component\Console\Helper\QuestionHelper;
 
 class Application extends App {
-	/** @var IManager */
-	private $encryptionManager;
+	private IManager $encryptionManager;
 	private IConfig $config;
 
 	/**

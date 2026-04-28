@@ -8,6 +8,8 @@ declare(strict_types=1);
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -32,47 +34,23 @@ use OCP\ILogger;
 use OCP\IUserSession;
 
 class Setup {
-	/**
-	 * @var Crypt
-	 */
-	private $crypt;
-	/**
-	 * @var KeyManager
-	 */
-	private $keyManager;
-	/**
-	 * @var ILogger
-	 */
-	private $logger;
-	/**
-	 * @var bool|string
-	 */
+	/** @var bool|string */
 	private $user;
 
-	/**
-	 * @param ILogger $logger
-	 * @param IUserSession $userSession
-	 * @param Crypt $crypt
-	 * @param KeyManager $keyManager
-	 */
 	public function __construct(
-		ILogger $logger,
-		IUserSession $userSession,
-		Crypt $crypt,
-		KeyManager $keyManager
+		private readonly ILogger $logger,
+		?IUserSession $userSession,
+		private readonly Crypt $crypt,
+		private readonly KeyManager $keyManager
 	) {
-		$this->logger = $logger;
 		$this->user = $userSession !== null && $userSession->isLoggedIn() ? $userSession->getUser()->getUID() : false;
-		$this->crypt = $crypt;
-		$this->keyManager = $keyManager;
 	}
 
 	/**
 	 * @param string $uid user id
 	 * @param string $password user password
-	 * @return bool
 	 */
-	public function setupUser($uid, $password) {
+	public function setupUser(string $uid, string $password): bool {
 		if (!$this->keyManager->userHasKeys($uid)) {
 			return $this->keyManager->storeKeyPair(
 				$uid,
@@ -86,7 +64,7 @@ class Setup {
 	/**
 	 * make sure that all system keys exists
 	 */
-	public function setupSystem() {
+	public function setupSystem(): void {
 		$this->keyManager->validateShareKey();
 		$this->keyManager->validateMasterKey();
 	}

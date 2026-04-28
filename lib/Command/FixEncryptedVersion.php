@@ -6,6 +6,8 @@ declare(strict_types=1);
  * @author Ilja Neumann <ineumann@owncloud.com>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -34,23 +36,16 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class FixEncryptedVersion extends Command {
-	/** @var IRootFolder  */
-	private $rootFolder;
-
-	/** @var IUserManager  */
-	private $userManager;
-
-	/** @var View  */
-	private $view;
-
-	public function __construct(IRootFolder $rootFolder, IUserManager $userManager, View $view) {
-		$this->rootFolder = $rootFolder;
-		$this->userManager = $userManager;
-		$this->view = $view;
+	public function __construct(
+		private readonly IRootFolder $rootFolder,
+		private readonly IUserManager $userManager,
+		private readonly View $view
+	) {
 		parent::__construct();
 	}
 
-	protected function configure() {
+	#[\Override]
+	protected function configure(): void {
 		parent::configure();
 
 		$this
@@ -74,11 +69,7 @@ class FixEncryptedVersion extends Command {
 			);
 	}
 
-	/**
-	 * @param InputInterface $input
-	 * @param OutputInterface $output
-	 * @return int
-	 */
+	#[\Override]
 	protected function execute(InputInterface $input, OutputInterface $output): int {
 		$user = $input->getArgument('user');
 		$pathToWalk = "/$user/files";
@@ -111,13 +102,10 @@ class FixEncryptedVersion extends Command {
 	}
 
 	/**
-	 * @param string $user
-	 * @param string $path
-	 * @param OutputInterface $output
-	 * @param int $incrRange  Range of versions to try (upper/lower bound)
+	 * @param int $incrRange Range of versions to try (upper/lower bound)
 	 * @return int 0 for success, 1 for error
 	 */
-	private function walkPathOfUser($user, $path, OutputInterface $output, $incrRange) {
+	private function walkPathOfUser(string $user, string $path, OutputInterface $output, int $incrRange): int {
 		$this->setupUserFs($user);
 		if (!$this->view->file_exists($path)) {
 			$output->writeln("<error>Path $path does not exist. Please provide a valid path.</error>");
@@ -147,12 +135,10 @@ class FixEncryptedVersion extends Command {
 	}
 
 	/**
-	 * @param string $path
-	 * @param OutputInterface $output
-	 * @param int $incrRange  Range of versions to try (upper/lower bound)
-	 * @param bool $ignoreCorrectEncVersionCall, setting this variable to false avoids recursion
+	 * @param int $incrRange Range of versions to try (upper/lower bound)
+	 * @param bool $ignoreCorrectEncVersionCall setting this variable to false avoids recursion
 	 */
-	private function verifyFileContent($path, OutputInterface $output, $incrRange, $ignoreCorrectEncVersionCall = true) {
+	private function verifyFileContent(string $path, OutputInterface $output, int $incrRange, bool $ignoreCorrectEncVersionCall = true): bool {
 		try {
 			/**
 			 * In encryption, the files are read in a block size of 8192 bytes
@@ -191,12 +177,9 @@ class FixEncryptedVersion extends Command {
 	}
 
 	/**
-	 * @param string $path
-	 * @param OutputInterface $output
-	 * @param int $incrRange  Range of versions to try (upper/lower bound)
-	 * @return bool
+	 * @param int $incrRange Range of versions to try (upper/lower bound)
 	 */
-	private function correctEncryptedVersion($path, OutputInterface $output, $incrRange) {
+	private function correctEncryptedVersion(string $path, OutputInterface $output, int $incrRange): bool {
 		$fileInfo = $this->view->getFileInfo($path);
 		$fileId = $fileInfo->getId();
 		$encryptedVersion = $fileInfo->getEncryptedVersion();
@@ -261,9 +244,8 @@ class FixEncryptedVersion extends Command {
 
 	/**
 	 * Setup user file system
-	 * @param string $uid
 	 */
-	private function setupUserFs($uid) {
+	private function setupUserFs(string $uid): void {
 		\OC_Util::tearDownFS();
 		\OC_Util::setupFS($uid);
 	}

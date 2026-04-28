@@ -1,0 +1,54 @@
+name: Build dist
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PHP_VERSION: '8.4'
+  APP_NAME: encryption
+
+jobs:
+  build:
+    name: Build app tarball
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: mbstring, openssl, zip
+          tools: composer:v2
+          coverage: none
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer
+          key: ${{ runner.os }}-composer-dist-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-dist-
+
+      - name: Install production dependencies
+        run: composer install --no-progress --prefer-dist --no-dev --optimize-autoloader
+
+      - name: Build dist
+        run: make dist
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-${{ github.sha }}
+          path: build/dist/${{ env.APP_NAME }}.tar.gz
+          if-no-files-found: error
+          retention-days: 14

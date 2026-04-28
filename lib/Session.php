@@ -7,6 +7,8 @@ declare(strict_types=1);
  * @author Lukas Reschke <lukas@statuscode.ch>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -29,19 +31,12 @@ use OCA\Encryption\Exceptions\PrivateKeyMissingException;
 use \OCP\ISession;
 
 class Session {
-	/** @var ISession */
-	protected $session;
-
 	public const NOT_INITIALIZED = '0';
 	public const INIT_EXECUTED = '1';
 	public const INIT_SUCCESSFUL = '2';
 	public const RUN_MIGRATION = '3';
 
-	/**
-	 * @param ISession $session
-	 */
-	public function __construct(ISession $session) {
-		$this->session = $session;
+	public function __construct(protected readonly ISession $session) {
 	}
 
 	/**
@@ -49,7 +44,7 @@ class Session {
 	 *
 	 * @param string $status INIT_SUCCESSFUL, INIT_EXECUTED, NOT_INITIALIZED
 	 */
-	public function setStatus($status) {
+	public function setStatus(string $status): void {
 		$this->session->set('encryptionInitialized', $status);
 	}
 
@@ -58,7 +53,7 @@ class Session {
 	 *
 	 * @return string init status INIT_SUCCESSFUL, INIT_EXECUTED, NOT_INITIALIZED
 	 */
-	public function getStatus() {
+	public function getStatus(): ?string {
 		$status = $this->session->get('encryptionInitialized');
 		if ($status === null) {
 			/** @phan-suppress-next-line PhanDeprecatedFunction */
@@ -78,7 +73,7 @@ class Session {
 	 * @return string $privateKey The user's plaintext private key
 	 * @throws Exceptions\PrivateKeyMissingException
 	 */
-	public function getPrivateKey() {
+	public function getPrivateKey(): string {
 		$key = $this->session->get('privateKey');
 		if ($key === null) {
 			throw new Exceptions\PrivateKeyMissingException('please try to log-out and log-in again');
@@ -88,10 +83,8 @@ class Session {
 
 	/**
 	 * check if private key is set
-	 *
-	 * @return boolean
 	 */
-	public function isPrivateKeySet() {
+	public function isPrivateKeySet(): bool {
 		$key = $this->session->get('privateKey');
 		if ($key === null) {
 			return false;
@@ -107,17 +100,14 @@ class Session {
 	 *
 	 * @note this should only be set on login
 	 */
-	public function setPrivateKey($key) {
+	public function setPrivateKey(string $key): void {
 		$this->session->set('privateKey', $key);
 	}
 
 	/**
 	 * store data needed for the decrypt all operation in the session
-	 *
-	 * @param string $user
-	 * @param string $key
 	 */
-	public function prepareDecryptAll($user, $key) {
+	public function prepareDecryptAll(string $user, string $key): void {
 		$this->session->set('decryptAll', true);
 		$this->session->set('decryptAllKey', $key);
 		$this->session->set('decryptAllUid', $user);
@@ -125,10 +115,8 @@ class Session {
 
 	/**
 	 * check if we are in decrypt all mode
-	 *
-	 * @return bool
 	 */
-	public function decryptAllModeActivated() {
+	public function decryptAllModeActivated(): bool {
 		$decryptAll = $this->session->get('decryptAll');
 		return ($decryptAll === true);
 	}
@@ -136,10 +124,9 @@ class Session {
 	/**
 	 * get uid used for decrypt all operation
 	 *
-	 * @return string
 	 * @throws \Exception
 	 */
-	public function getDecryptAllUid() {
+	public function getDecryptAllUid(): string {
 		$uid = $this->session->get('decryptAllUid');
 		if (($uid === null) && $this->decryptAllModeActivated()) {
 			throw new \Exception('No uid found while in decrypt all mode');
@@ -153,10 +140,9 @@ class Session {
 	/**
 	 * get private key for decrypt all operation
 	 *
-	 * @return string
 	 * @throws PrivateKeyMissingException
 	 */
-	public function getDecryptAllKey() {
+	public function getDecryptAllKey(): string {
 		$privateKey = $this->session->get('decryptAllKey');
 		if (($privateKey === null) && $this->decryptAllModeActivated()) {
 			throw new PrivateKeyMissingException('No private key found while in decrypt all mode');
@@ -170,7 +156,7 @@ class Session {
 	/**
 	 * remove keys from session
 	 */
-	public function clear() {
+	public function clear(): void {
 		$this->session->remove('publicSharePrivateKey');
 		$this->session->remove('privateKey');
 		$this->session->remove('encryptionInitialized');

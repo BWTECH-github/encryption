@@ -5,6 +5,8 @@ declare(strict_types=1);
 * @author Sujith Haridasan <sharidasan@owncloud.com>
 *
 * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
 * @license AGPL-3.0
 *
 * This code is free software: you can redistribute it and/or modify
@@ -36,55 +38,22 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
 
 class RecreateMasterKey extends Command {
-	/** @var View  */
-	protected $rootView;
-
-	/** @var Util  */
-	protected $util;
-
-	/** @var \OC\Encryption\Util  */
-	protected $encUtil;
-
-	/** @var  IAppManager */
-	protected $appManager;
-
-	/** @var  IAppConfig */
-	protected $appConfig;
-
-	/** @var EncDecAllFactory */
-	private $encDecAllFactory;
-
 	/** @var array files which couldn't be decrypted */
 	protected $failed;
 
-	/**
-	 * RecreateMasterKey constructor.
-	 *
-	 * @param View $rootView
-	 * @param Util $util
-	 * @param \OC\Encryption\Util $encUtil
-	 * @param IAppManager $appManager
-	 * @param IAppConfig $appConfig
-	 * @param EncDecAllFactory $encDecAllFactory
-	 */
 	public function __construct(
-		View $rootView,
-		Util $util,
-		\OC\Encryption\Util $encUtil,
-		IAppManager $appManager,
-		IAppConfig $appConfig,
-		EncDecAllFactory $encDecAllFactory
+		protected readonly View $rootView,
+		protected readonly Util $util,
+		protected readonly \OC\Encryption\Util $encUtil,
+		protected readonly IAppManager $appManager,
+		protected readonly IAppConfig $appConfig,
+		private readonly EncDecAllFactory $encDecAllFactory
 	) {
 		parent::__construct();
-		$this->rootView = $rootView;
-		$this->util = $util;
-		$this->encUtil = $encUtil;
-		$this->appManager = $appManager;
-		$this->appConfig = $appConfig;
-		$this->encDecAllFactory = $encDecAllFactory;
 	}
 
-	protected function configure() {
+	#[\Override]
+	protected function configure(): void {
 		parent::configure();
 
 		$this
@@ -101,11 +70,9 @@ class RecreateMasterKey extends Command {
 	}
 
 	/**
-	 * @param InputInterface $input
-	 * @param OutputInterface $output
-	 * @return int
 	 * @throws \Exception
 	 */
+	#[\Override]
 	protected function execute(InputInterface $input, OutputInterface $output): int {
 		$yes = $input->getOption('yes');
 		if ($this->util->isMasterKeyEnabled()) {

@@ -5,6 +5,8 @@ declare(strict_types=1);
  * @author Jannik Stehle <jstehle@owncloud.com>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -41,45 +43,22 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\Question;
 
 class HSMDaemonDecrypt extends Command {
-	/** @var IClient */
-	private $httpClient;
-	/** @var IConfig */
-	private $config;
-	/** @var ITimeFactory */
-	private $timeFactory;
-	/** @var KeyManager */
-	private $keyManager;
-	/** @var CryptHSM */
-	private $crypt;
-	/** @var Util */
-	private $util;
+	private readonly IClient $httpClient;
 
-	/**
-	 * @param IClientService $httpClient
-	 * @param IConfig $config
-	 * @param ITimeFactory $timeFactory
-	 * @param KeyManager $keyManager
-	 * @param CryptHSM $crypt
-	 * @param Util $util
-	 */
 	public function __construct(
 		IClientService $httpClient,
-		IConfig $config,
-		ITimeFactory $timeFactory,
-		KeyManager $keyManager,
-		CryptHSM $crypt,
-		Util $util
+		private readonly IConfig $config,
+		private readonly ITimeFactory $timeFactory,
+		private readonly KeyManager $keyManager,
+		private readonly CryptHSM $crypt,
+		private readonly Util $util
 	) {
 		$this->httpClient = $httpClient->newClient();
-		$this->config = $config;
-		$this->timeFactory = $timeFactory;
-		$this->keyManager = $keyManager;
-		$this->crypt = $crypt;
-		$this->util = $util;
 		parent::__construct();
 	}
 
-	protected function configure() {
+	#[\Override]
+	protected function configure(): void {
 		$this
 			->setName('encryption:hsmdaemon:decrypt')
 			->setDescription('Decrypt a base64 encoded string via hsmdaemon')
@@ -104,11 +83,9 @@ class HSMDaemonDecrypt extends Command {
 	}
 
 	/**
-	 * @param InputInterface $input
-	 * @param OutputInterface $output
-	 * @return int
 	 * @throws \Exception
 	 */
+	#[\Override]
 	protected function execute(InputInterface $input, OutputInterface $output): int {
 		$hsmUrl = $this->config->getAppValue('encryption', 'hsm.url');
 		if (!$hsmUrl || !\is_string($hsmUrl)) {
@@ -149,8 +126,6 @@ class HSMDaemonDecrypt extends Command {
 	/**
 	 * Get the key id used for decryption
 	 *
-	 * @param InputInterface $input
-	 * @param string $password
 	 * @return false|string
 	 * @throws MissingInputException|PrivateKeyMissingException
 	 */

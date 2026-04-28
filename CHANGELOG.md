@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Changed
+
+- Forked for [owncloud.online](https://bw.tech) and rebranded by BW-Tech GmbH.
+- Minimum PHP version raised to 8.4; `composer.json`, `appinfo/info.xml`, and `composer.lock` aligned.
+- Maximum supported ownCloud Core bumped to 11.
+- Code modernized to PHP 8.4 idioms: constructor property promotion with `readonly` for DI dependencies, typed properties, `#[\Override]` on parent/interface methods, `match` expressions, explicit nullable parameters.
+- CI moved off Drone and the upstream `owncloud/reusable-workflows` to self-contained GitHub Actions workflows that clone `BWTECH-github/owncloud.online` as the Core to test against.
+
+### Removed
+
+- Translation-sync workflow (no Transifex credentials in the fork).
+
 ## [1.6.1] - 2023-07-27
 
 ### Changed
