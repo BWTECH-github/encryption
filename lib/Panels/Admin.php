@@ -5,6 +5,8 @@ declare(strict_types=1);
  * @author Tom Needham <tom@owncloud.com>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -36,43 +38,27 @@ use OCP\ISession;
 use OCP\IUserSession;
 
 class Admin implements ISettings {
-	/** @var IConfig */
-	protected $config;
-	/** @var ILogger */
-	protected $logger;
-	/** @var IUserSession */
-	protected $userSession;
-	/** @var IUserManager */
-	protected $userManager;
-	/** @var ISession */
-	protected $session;
-	/** @var IL10N */
-	protected $l;
-
 	public function __construct(
-		IConfig $config,
-		ILogger $logger,
-		IUserSession $userSession,
-		IUserManager $userManager,
-		ISession $session,
-		IL10N $l
+		protected readonly IConfig $config,
+		protected readonly ILogger $logger,
+		protected readonly IUserSession $userSession,
+		protected readonly IUserManager $userManager,
+		protected readonly ISession $session,
+		protected readonly IL10N $l
 	) {
-		$this->config = $config;
-		$this->logger = $logger;
-		$this->userSession = $userSession;
-		$this->userManager = $userManager;
-		$this->session = $session;
-		$this->l = $l;
 	}
 
-	public function getPriority() {
+	#[\Override]
+	public function getPriority(): int {
 		return 0;
 	}
 
-	public function getSectionID() {
+	#[\Override]
+	public function getSectionID(): string {
 		return 'encryption';
 	}
 
+	#[\Override]
 	public function getPanel() {
 		$tmpl = new Template('encryption', 'settings-admin');
 		$crypt = new Crypt(

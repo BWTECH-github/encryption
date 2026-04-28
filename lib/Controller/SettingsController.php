@@ -6,6 +6,8 @@ declare(strict_types=1);
  * @author Joas Schilling <coding@schilljs.com>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -38,63 +40,19 @@ use OCP\IUserManager;
 use OCP\IUserSession;
 
 class SettingsController extends Controller {
-	/** @var IL10N */
-	private $l;
-
-	/** @var IUserManager */
-	private $userManager;
-
-	/** @var IUserSession */
-	private $userSession;
-
-	/** @var KeyManager */
-	private $keyManager;
-
-	/** @var Crypt */
-	private $crypt;
-
-	/** @var Session */
-	private $session;
-
-	/** @var ISession  */
-	private $ocSession;
-
-	/** @var  Util */
-	private $util;
-
-	/**
-	 * @param string $AppName
-	 * @param IRequest $request
-	 * @param IL10N $l10n
-	 * @param IUserManager $userManager
-	 * @param IUserSession $userSession
-	 * @param KeyManager $keyManager
-	 * @param Crypt $crypt
-	 * @param Session $session
-	 * @param ISession $ocSession
-	 * @param Util $util
-	 */
 	public function __construct(
-		$AppName,
+		string $AppName,
 		IRequest $request,
-		IL10N $l10n,
-		IUserManager $userManager,
-		IUserSession $userSession,
-		KeyManager $keyManager,
-		Crypt $crypt,
-		Session $session,
-		ISession $ocSession,
-		Util $util
+		private readonly IL10N $l,
+		private readonly IUserManager $userManager,
+		private readonly IUserSession $userSession,
+		private readonly KeyManager $keyManager,
+		private readonly Crypt $crypt,
+		private readonly Session $session,
+		private readonly ISession $ocSession,
+		private readonly Util $util
 	) {
 		parent::__construct($AppName, $request);
-		$this->l = $l10n;
-		$this->userSession = $userSession;
-		$this->userManager = $userManager;
-		$this->keyManager = $keyManager;
-		$this->crypt = $crypt;
-		$this->session = $session;
-		$this->ocSession = $ocSession;
-		$this->util = $util;
 	}
 
 	/**
@@ -103,9 +61,8 @@ class SettingsController extends Controller {
 	 *
 	 * @param string $oldPassword
 	 * @param string $newPassword
-	 * @return DataResponse
 	 */
-	public function updatePrivateKeyPassword($oldPassword, $newPassword) {
+	public function updatePrivateKeyPassword($oldPassword, $newPassword): DataResponse {
 		$result = false;
 		$uid = $this->userSession->getUser()->getUID();
 		$errorMessage = $this->l->t('Could not update the private key password.');
@@ -156,9 +113,8 @@ class SettingsController extends Controller {
 	 * @UseSession
 	 *
 	 * @param bool $encryptHomeStorage
-	 * @return DataResponse
 	 */
-	public function setEncryptHomeStorage($encryptHomeStorage) {
+	public function setEncryptHomeStorage($encryptHomeStorage): DataResponse {
 		$this->util->setEncryptHomeStorage($encryptHomeStorage);
 		return new DataResponse();
 	}

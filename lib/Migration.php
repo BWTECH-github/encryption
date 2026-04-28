@@ -9,6 +9,8 @@ declare(strict_types=1);
  * @author Vincent Petry <pvince81@owncloud.com>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -28,42 +30,23 @@ declare(strict_types=1);
 namespace OCA\Encryption;
 
 use OC\Files\View;
+use OCA\Encryption\Crypto\Encryption;
 use OCP\IConfig;
 use OCP\IDBConnection;
 use OCP\ILogger;
 
 class Migration {
-	/** @var string */
-	private string $moduleId;
+	private readonly string $moduleId;
+	protected readonly string $installedVersion;
 
-	/** @var View */
-	private View $view;
-
-	/** @var IDBConnection */
-	private IDBConnection $connection;
-
-	/** @var IConfig */
-	private IConfig $config;
-
-	/** @var ILogger */
-	private ILogger $logger;
-
-	/** @var string */
-	protected string $installedVersion;
-
-	/**
-	 * @param IConfig $config
-	 * @param View $view
-	 * @param IDBConnection $connection
-	 * @param ILogger $logger
-	 */
-	public function __construct(IConfig $config, View $view, IDBConnection $connection, ILogger $logger) {
-		$this->view = $view;
+	public function __construct(
+		private readonly IConfig $config,
+		private readonly View $view,
+		private readonly IDBConnection $connection,
+		private readonly ILogger $logger
+	) {
 		$this->view->disableCacheUpdate();
-		$this->connection = $connection;
-		$this->moduleId = \OCA\Encryption\Crypto\Encryption::ID;
-		$this->config = $config;
-		$this->logger = $logger;
+		$this->moduleId = Encryption::ID;
 		$this->installedVersion = $this->config->getAppValue('files_encryption', 'installed_version', '-1');
 	}
 

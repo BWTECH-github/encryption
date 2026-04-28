@@ -5,6 +5,8 @@ declare(strict_types=1);
  * @author Thomas Müller <thomas.mueller@tmit.eu>
  *
  * @copyright Copyright (c) 2019, ownCloud GmbH
+ * Modified by BW-Tech GmbH for owncloud.online (PHP 8.4).
+ * 
  * @license AGPL-3.0
  *
  * This code is free software: you can redistribute it and/or modify
@@ -25,10 +27,7 @@ namespace OCA\Encryption\Exceptions;
 use OCP\Encryption\Exceptions\GenericEncryptionException;
 
 class PublicKeyMissingException extends GenericEncryptionException {
-	/**
-	 * @param string $userId
-	 */
-	public function __construct($userId) {
+	public function __construct(string $userId) {
 		if (empty($userId)) {
 			$userId = "<no-user-id-given>";
 		}
