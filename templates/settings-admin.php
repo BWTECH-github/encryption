@@ -41,7 +41,7 @@ style('encryption', 'settings-admin');
 		</p>
 		<br/>
 		<?php endif; ?>
-		
+
 		<p id="encryptHomeStorageSetting" class="hidden">
 			<input type="checkbox" class="checkbox" name="encrypt_home_storage" id="encryptHomeStorage"
 				   value="1" <?php if ($_['encryptHomeStorage']) {
