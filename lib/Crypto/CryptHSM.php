@@ -72,8 +72,8 @@ class CryptHSM extends Crypt {
 		ITimeFactory $timeFactory
 	) {
 		parent::__construct($logger, $userSession, $config, $l);
-		$this->hsmUrl = \rtrim($this->config->getAppValue('encryption', 'hsm.url'), '/'); // no default, because Application DI only instantiates this if it is configured non empty
-		$this->secret = $this->config->getAppValue('encryption', 'hsm.jwt.secret', 'secret');
+		$this->hsmUrl = \rtrim((string)$this->config->getAppValue('encryption', 'hsm.url', ''), '/');
+		$this->secret = (string)$this->config->getAppValue('encryption', 'hsm.jwt.secret', 'secret');
 		$this->clockSkew = (int)$this->config->getAppValue('encryption', 'hsm.jwt.clockskew', '120'); // 2min
 		$this->clientService = $clientService;
 		$this->request = $request;

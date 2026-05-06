@@ -250,6 +250,6 @@ class UserHooks implements IHook {
 	 * @param string $uid user id
 	 */
 	protected function setupFS(string $uid): void {
-		\OC_Util::setupFS($uid);
+		\call_user_func(['OC_Util', 'setupFS'], $uid);
 	}
 }

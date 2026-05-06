@@ -155,10 +155,10 @@ class Application extends App {
 				$server = $c->getServer();
 
 				if ($this->config->getAppValue('encryption', 'hsm.url', '') !== '') {
-					$this->config->setAppValue('crypto.engine', 'internal', 'hsm');
+					$this->config->setAppValue('encryption', 'crypto.engine', 'hsm');
 				}
 
-				if ($this->config->getAppValue('crypto.engine', 'internal', '') === 'hsm') {
+				if ($this->config->getAppValue('encryption', 'crypto.engine', 'internal') === 'hsm') {
 					return new CryptHSM(
 						$server->getLogger(),
 						$server->getUserSession(),

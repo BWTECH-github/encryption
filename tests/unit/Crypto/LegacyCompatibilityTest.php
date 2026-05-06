@@ -300,7 +300,7 @@ class LegacyCompatibilityTest extends TestCase {
 	/**
 	 * Helper method to invoke private methods
 	 */
-	protected function invokePrivate($object, string $methodName, array $parameters = []) {
+	protected static function invokePrivate($object, $methodName, array $parameters = []) {
 		$reflection = new \ReflectionClass(\get_class($object));
 		$method = $reflection->getMethod($methodName);
 		$method->setAccessible(true);

@@ -107,6 +107,18 @@ class HSMDaemonDecrypt extends Command {
 			return 1;
 		}
 
+		$payload = $input->getArgument('decrypt');
+		if (!\is_string($payload) || $payload === '') {
+			$output->writeln("<error>No ciphertext provided</error>");
+			return 1;
+		}
+
+		$decodedPayload = \base64_decode($payload, true);
+		if ($decodedPayload === false) {
+			$output->writeln("<error>Ciphertext must be valid base64</error>");
+			return 1;
+		}
+
 		$response = $this->httpClient->post($hsmUrl . '/decrypt/' . $keyId, [
 			'headers' => [
 				'Authorization' => 'Bearer ' . JWT::token([
@@ -115,7 +127,7 @@ class HSMDaemonDecrypt extends Command {
 						'exp' => $this->timeFactory->getTime(),
 					], $this->config->getAppValue('encryption', 'hsm.jwt.secret', 'secret'))
 			],
-			'body' => \base64_decode($input->getArgument('decrypt'))
+			'body' => $decodedPayload
 		]);
 
 		$decryptedStr = $response->getBody();

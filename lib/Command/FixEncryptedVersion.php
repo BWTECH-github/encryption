@@ -72,17 +72,7 @@ class FixEncryptedVersion extends Command {
 	#[\Override]
 	protected function execute(InputInterface $input, OutputInterface $output): int {
 		$user = $input->getArgument('user');
-		$pathToWalk = "/$user/files";
-
-		/**
-		 * trim() returns an empty string when the argument is an unset/null
-		 */
-		$pathOption = \trim($input->getOption('path'), '/');
-		if ($pathOption !== "") {
-			$pathToWalk = "$pathToWalk/$pathOption";
-		}
-
-		if ($user === null) {
+		if (!\is_string($user) || $user === '') {
 			$output->writeln("<error>No user id provided.</error>\n");
 			return 1;
 		}
@@ -90,6 +80,12 @@ class FixEncryptedVersion extends Command {
 		if ($this->userManager->get($user) === null) {
 			$output->writeln("<error>User id $user does not exist. Please provide a valid user id</error>");
 			return 1;
+		}
+
+		$pathToWalk = "/$user/files";
+		$pathOption = \trim((string)$input->getOption('path'), '/');
+		if ($pathOption !== "") {
+			$pathToWalk = "$pathToWalk/$pathOption";
 		}
 
 		$increment = \intval($input->getOption('increment-range'));
@@ -246,7 +242,7 @@ class FixEncryptedVersion extends Command {
 	 * Setup user file system
 	 */
 	private function setupUserFs(string $uid): void {
-		\OC_Util::tearDownFS();
-		\OC_Util::setupFS($uid);
+		\call_user_func(['OC_Util', 'tearDownFS']);
+		\call_user_func(['OC_Util', 'setupFS'], $uid);
 	}
 }

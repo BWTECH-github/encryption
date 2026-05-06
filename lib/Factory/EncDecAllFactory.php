@@ -114,7 +114,7 @@ class EncDecAllFactory {
 	 * @return Crypt|CryptHSM
 	 */
 	private function getCryptoEngine() {
-		if ($this->config->getAppValue('crypto.engine', 'internal', '') === 'hsm') {
+		if ($this->config->getAppValue('encryption', 'crypto.engine', 'internal') === 'hsm') {
 			return $this->cryptHSM;
 		}
 
