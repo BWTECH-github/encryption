@@ -115,8 +115,8 @@ class Migration {
 	 */
 	public function reorganizeFolderStructureForUser(string $user): void {
 		// backup all keys
-		\OC_Util::tearDownFS();
-		\OC_Util::setupFS($user);
+		\call_user_func(['OC_Util', 'tearDownFS']);
+		\call_user_func(['OC_Util', 'setupFS'], $user);
 		if ($this->backupUserKeys($user)) {
 			// rename users private key
 			$this->renameUsersPrivateKey($user);
@@ -125,7 +125,7 @@ class Migration {
 			$path = '/files_encryption/keys';
 			$this->renameFileKeys($user, $path);
 			$trashPath = '/files_trashbin/keys';
-			if (\OC_App::isEnabled('files_trashbin') && $this->view->is_dir($user . '/' . $trashPath)) {
+			if (\call_user_func(['OC_App', 'isEnabled'], 'files_trashbin') && $this->view->is_dir($user . '/' . $trashPath)) {
 				$this->renameFileKeys($user, $trashPath, true);
 				$this->view->deleteAll($trashPath);
 			}

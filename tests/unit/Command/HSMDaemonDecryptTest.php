@@ -114,6 +114,8 @@ class HSMDaemonDecryptTest extends TestCase {
 			->willReturn('http://localhost:1234', 'masterKeyId', 'jwtSecret');
 		$inputInterface->expects($this->any())->method('getOption')
 			->willReturn(null);
+		$inputInterface->method('getArgument')
+			->willReturn(\base64_encode('cipher'));
 		$this->util->expects($this->once())
 			->method('isMasterKeyEnabled')
 			->willReturn(true);
@@ -141,6 +143,8 @@ class HSMDaemonDecryptTest extends TestCase {
 			->willReturn('http://localhost:1234', 'jwtSecret');
 		$inputInterface->expects($this->any())->method('getOption')
 			->willReturn('user', 'user', null, 'user');
+		$inputInterface->method('getArgument')
+			->willReturn(\base64_encode('cipher'));
 		$this->util->expects($this->never())->method('isMasterKeyEnabled');
 		$this->keyManager->expects($this->once())
 			->method('getPrivateKey')
@@ -163,6 +167,8 @@ class HSMDaemonDecryptTest extends TestCase {
 			->willReturn('http://localhost:1234', 'jwtSecret');
 		$inputInterface->expects($this->exactly(2))->method('getOption')
 			->willReturn(null, 'keyId');
+		$inputInterface->method('getArgument')
+			->willReturn(\base64_encode('cipher'));
 		$this->util->expects($this->never())->method('isMasterKeyEnabled');
 
 		$this->invokePrivate($this->hsmDaemonDecrypt, 'execute', [$inputInterface, $outputInterface]);

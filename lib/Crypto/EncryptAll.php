@@ -37,6 +37,7 @@ use OCP\IL10N;
 use OCP\IUserManager;
 use OCP\Mail\IMailer;
 use OCP\Security\ISecureRandom;
+use OCP\Template;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Helper\Table;
@@ -333,8 +334,8 @@ class EncryptAll {
 	 * setup user file system
 	 */
 	protected function setupUserFS(string $uid): void {
-		\OC_Util::tearDownFS();
-		\OC_Util::setupFS($uid);
+		\call_user_func(['OC_Util', 'tearDownFS']);
+		\call_user_func(['OC_Util', 'setupFS'], $uid);
 	}
 
 	/**
@@ -422,11 +423,11 @@ class EncryptAll {
 	 * @return array an array of the html mail body and the plain text mail body
 	 */
 	protected function createMailBody(string $password): array {
-		$html = new \OC_Template("encryption", "mail", "");
+		$html = new Template("encryption", "mail", "");
 		$html->assign('password', $password);
 		$htmlMail = $html->fetchPage();
 
-		$plainText = new \OC_Template("encryption", "altmail", "");
+		$plainText = new Template("encryption", "altmail", "");
 		$plainText->assign('password', $password);
 		$plainTextMail = $plainText->fetchPage();
 

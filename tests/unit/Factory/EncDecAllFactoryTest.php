@@ -114,7 +114,7 @@ class EncDecAllFactoryTest extends TestCase {
 		$this->config->method('getAppValue')
 			->will($this->returnValueMap([
 				['encryption', 'recoveryKeyId', '', 'foo'],
-				['crypto.engine', 'internal', '', $hsm]
+				['encryption', 'crypto.engine', 'internal', $hsm]
 			]));
 
 		$encObject = $this->encdecAllFactory->getEncryptAllObj();
