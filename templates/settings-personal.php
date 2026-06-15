@@ -32,7 +32,7 @@
 				type="password"
 				name="changePrivateKeyPassword"
 				id="newPrivateKeyPassword" />
-			<label for="newRecoveryPassword"><?php p($l->t("Current log-in password")); ?></label>
+			<label for="newPrivateKeyPassword"><?php p($l->t("Current log-in password")); ?></label>
 			<br />
 			<button
 				type="button"
