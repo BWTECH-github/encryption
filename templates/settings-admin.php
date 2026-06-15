@@ -63,10 +63,12 @@ style('encryption', 'settings-admin');
 				<input type="password"
 					   name="encryptionRecoveryPassword"
 					   id="encryptionRecoveryPassword"
+					   aria-label="<?php p($l->t("Recovery key password")); ?>"
 					   placeholder="<?php p($l->t("Recovery key password")); ?>"/>
 				<input type="password"
 					   name="encryptionRecoveryPassword"
 					   id="repeatEncryptionRecoveryPassword"
+					   aria-label="<?php p($l->t("Repeat recovery key password")); ?>"
 					   placeholder="<?php p($l->t("Repeat recovery key password")); ?>"/>
 				<input type="button"
 					   name="enableRecoveryKey"
@@ -86,17 +88,20 @@ style('encryption', 'settings-admin');
 					type="password"
 					name="changeRecoveryPassword"
 					id="oldEncryptionRecoveryPassword"
+					aria-label="<?php p($l->t("Old recovery key password")); ?>"
 					placeholder="<?php p($l->t("Old recovery key password")); ?>"/>
 				<br />
 				<input
 					type="password"
 					name="changeRecoveryPassword"
 					id="newEncryptionRecoveryPassword"
+					aria-label="<?php p($l->t("New recovery key password")); ?>"
 					placeholder="<?php p($l->t("New recovery key password")); ?>"/>
 				<input
 					type="password"
 					name="changeRecoveryPassword"
 					id="repeatedNewEncryptionRecoveryPassword"
+					aria-label="<?php p($l->t("Repeat new recovery key password")); ?>"
 					placeholder="<?php p($l->t("Repeat new recovery key password")); ?>"/>
 
 				<button
