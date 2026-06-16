@@ -12,10 +12,9 @@
 
 	<?php elseif ($_["initialized"] === \OCA\Encryption\Session::INIT_EXECUTED): ?>
 		<p>
-			<a name="changePKPasswd" />
-			<label for="changePrivateKeyPasswd">
+			<span class="warning">
 				<em><?php p($l->t("Your private key password no longer matches your log-in password.")); ?></em>
-			</label>
+			</span>
 			<br />
 			<?php p($l->t("Set your old private key password to your current log-in password:")); ?>
 			<?php if ($_["recoveryEnabledForUser"]):
