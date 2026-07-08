@@ -66,5 +66,9 @@
 			<?php echo($_["recoveryEnabledForUser"] === false ? 'checked="checked"' : ''); ?> />
 			<label for="userDisableRecoveryCheckbox"><?php p($l->t("Disabled")); ?></label>
 		</p>
+	<?php else: ?>
+		<p>
+			<em><?php p($l->t("Server-side encryption is active and your files are encrypted transparently. No personal settings are required.")); ?></em>
+		</p>
 	<?php endif; ?>
 </form>

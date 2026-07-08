@@ -62,6 +62,7 @@ OC.L10N.register(
     "Current log-in password" : "Aktuelles Passwort",
     "Update Private Key Password" : "Passwort für den privaten Schlüssel aktualisieren",
     "Enable password recovery:" : "Passwortwiederherstellung aktivieren:",
+    "Server-side encryption is active and your files are encrypted transparently. No personal settings are required." : "Die serverseitige Verschlüsselung ist aktiv und Deine Dateien werden transparent verschlüsselt. Es sind keine persönlichen Einstellungen erforderlich.",
     "Enabling this option will allow you to reobtain access to your encrypted files in case of password loss" : "Wenn Du diese Option aktivierst, kannst Du Deine verschlüsselten Dateien wiederherstellen, falls Du Dein Passwort vergisst",
     "Enabled" : "Aktiviert",
     "Disabled" : "Deaktiviert"
