@@ -86,13 +86,14 @@ class Personal implements ISettings {
 		$initialized = $session->getStatus();
 		$recoveryAdminEnabled = $this->config->getAppValue('encryption', 'recoveryAdminEnabled');
 		$recoveryEnabledForUser = $util->isRecoveryEnabledForUser($user);
-		if ($recoveryAdminEnabled || !$privateKeySet) {
-			$template->assign('recoveryEnabled', $recoveryAdminEnabled);
-			$template->assign('recoveryEnabledForUser', $recoveryEnabledForUser);
-			$template->assign('privateKeySet', $privateKeySet);
-			$template->assign('initialized', $initialized);
-			return $template;
-		}
-		return null;
+		// Frueher wurde hier null zurueckgegeben (Master-Key + initialisierter
+		// Schluessel + kein Recovery) — dadurch blieb die Sektion
+		// "Verschluesselung" in den persoenlichen Einstellungen komplett leer.
+		// Das Template zeigt fuer diesen Fall jetzt einen Info-Hinweis an.
+		$template->assign('recoveryEnabled', $recoveryAdminEnabled);
+		$template->assign('recoveryEnabledForUser', $recoveryEnabledForUser);
+		$template->assign('privateKeySet', $privateKeySet);
+		$template->assign('initialized', $initialized);
+		return $template;
 	}
 }
