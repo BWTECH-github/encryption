@@ -26,7 +26,7 @@
 				<tr>
 					<td width="20px">&nbsp;</td>
 					<td style="font-weight:normal; font-size:0.8em; line-height:1.2em; font-family:verdana,'arial',sans;">
-						<?php print_unescaped($this->inc('html.mail.footer')); ?>
+						<?php print_unescaped($this->inc('html.mail.footer', ['app' => 'core'])); ?>
 					</td>
 				</tr>
 				<tr>
