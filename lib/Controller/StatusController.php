@@ -50,7 +50,7 @@ class StatusController extends Controller {
 			Session::RUN_MIGRATION => [
 				'interactionNeeded',
 				(string)$this->l->t(
-					'You need to migrate your encryption keys from the old encryption (ownCloud <= 8.0) to the new one. Please run \'occ encryption:migrate\' or contact your administrator'
+					'You need to migrate your encryption keys from the old encryption (version 8.0 and older) to the new one. Please run \'occ encryption:migrate\' or contact your administrator'
 				),
 			],
 			Session::INIT_EXECUTED => [
