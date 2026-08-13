@@ -1,23 +1,23 @@
 # encryption
 
-Server-side encryption module for ownCloud (PHP 8.4 fork maintained by BW-Tech GmbH for [owncloud.online](https://bw.tech)).
+Server-side encryption module for owncloud.online (PHP 8.4 fork maintained by BW-Tech GmbH for [owncloud.online](https://bw.tech)).
 
-This is a fork of [owncloud/encryption](https://github.com/owncloud/encryption) modernized for PHP 8.4 and ownCloud 11. Encryption logic is preserved — only the platform requirements, branding, and code idioms have changed.
+This is a fork of [owncloud/encryption](https://github.com/BWTECH-github/encryption) modernized for PHP 8.4 and owncloud.online 11. Encryption logic is preserved — only the platform requirements, branding, and code idioms have changed.
 
 ## Features
 
-- AES-256 transparent server-side encryption of files in ownCloud
+- AES-256 transparent server-side encryption of files in owncloud.online
 - Master-key based encryption (admin-controlled, no per-user passwords required)
 - Optional recovery key for password-reset scenarios
 - HSM (Hardware Security Module) backend for storing the master private key off-server
 - OCC commands for migration, recovery, and master-key rotation
-- Compatible with files encrypted by upstream ownCloud encryption 1.5–1.6.x (legacy RC4 fallback for `openssl_seal` payloads)
+- Compatible with files encrypted by upstream owncloud.online encryption 1.5–1.6.x (legacy RC4 fallback for `openssl_seal` payloads)
 
 ## Requirements
 
 | Component | Minimum |
 |-----------|---------|
-| ownCloud Core | 10.12 (max 11) |
+| owncloud.online Core | 10.12 (max 11) |
 | PHP | 8.4 |
 | OpenSSL | 1.1.x or 3.x with legacy provider enabled (see notes below) |
 | ext-openssl | required |
@@ -119,12 +119,12 @@ sudo -u www-data php occ encryption:fix-encrypted-version alice -p "/Documents/I
 
 ## Daily usage
 
-For most installations there is nothing to do day-to-day — encryption is transparent. Watch the ownCloud log (`config/data/owncloud.log`) for `OCA\Encryption` entries. Typical events:
+For most installations there is nothing to do day-to-day — encryption is transparent. Watch the owncloud.online log (`config/data/owncloud.log`) for `OCA\Encryption` entries. Typical events:
 
 - New file uploaded → silently encrypted, key derived from master key, share-keys generated for any users with access
 - File shared → share-key for the new recipient added, no re-encryption of file body
 - User password changed → only personal recovery key (if used) re-wrapped; master-key files unaffected
-- User deleted → user's share-keys are cleaned up by ownCloud Core hooks; file bodies remain readable via master key
+- User deleted → user's share-keys are cleaned up by owncloud.online Core hooks; file bodies remain readable via master key
 
 ## Troubleshooting
 
@@ -141,7 +141,7 @@ For most installations there is nothing to do day-to-day — encryption is trans
 
 ## Attribution
 
-- Original code © ownCloud GmbH and the ownCloud encryption authors. Licensed under [AGPL-3.0](LICENSE).
+- Original code © ownCloud GmbH and the owncloud.online encryption authors. Licensed under [AGPL-3.0](LICENSE).
 - PHP 8.4 fork and owncloud.online branding © BW-Tech GmbH. Same AGPL-3.0 license.
-- Upstream: <https://github.com/owncloud/encryption>
+- Upstream: <https://github.com/BWTECH-github/encryption>
 - This fork: <https://github.com/BWTECH-github/owncloud.online>
