@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [2.0.6] - 2026-08-13
+
+### Changed
+
+- Marktbeschreibung neu, deutsch und englisch, mit dem Hinweis, dass das
+  Einschalten praktisch endgueltig ist und was der Rueckweg kostet.
+
 ## [2.0.5] - 2026-08-13
 
 ### Changed

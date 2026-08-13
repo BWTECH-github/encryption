@@ -2,17 +2,65 @@
 <info>
 	<id>encryption</id>
 	<description>
-		In order to use this encryption module you need to enable server-side
-		encryption in the admin settings. Once enabled this module will encrypt
-		all your files transparently. The encryption is based on AES 256 keys.
-		The module won't touch existing files, only new files will be encrypted
-		after server-side encryption was enabled. It is also not possible to
-		disable the encryption again and switch back to a unencrypted system.
-		Please read the documentation to know all implications before you decide
-		to enable server-side encryption.
+Server-side encryption stores your files as ciphertext on disk. Anyone who can
+read the storage - a hosting provider, a stolen disk, a backup tape, an S3
+bucket - sees AES-256 ciphertext instead of your documents. It does not protect
+against an attacker who controls the running server, because the key lives
+there.
 
-		PHP 8.4 fork maintained by BW-Tech GmbH for owncloud.online.
-	</description>
+**How it works**
+
+Files are encrypted transparently on write and decrypted on read. Sharing,
+versions, trash bin and the desktop and mobile clients keep working; users
+notice nothing. Two modes are available: a single master key for the whole
+instance (recommended, no user interaction) or per-user keys derived from the
+login password.
+
+**Before you switch it on**
+
+Switching encryption on is a one-way decision in practice. `occ
+encryption:decrypt-all` reports success but does not touch file versions or the
+trash bin, and `occ encryption:disable` refuses while any encrypted file
+remains. Going back therefore means discarding every file version and emptying
+every trash bin first. Decide before you enable it, not after.
+
+Existing files are not encrypted automatically - run `occ
+encryption:encrypt-all` for that. Keep a backup of the key storage
+(`data/files_encryption`): without it, encrypted files are lost for good.
+
+---
+
+**Deutsch**
+
+Serverseitige Verschluesselung legt Dateien als Chiffrat auf der Platte ab. Wer
+den Speicher lesen kann - ein Hoster, eine entwendete Platte, ein Sicherungsband,
+ein S3-Eimer - sieht AES-256-Chiffrat statt Ihrer Dokumente. Gegen einen
+Angreifer, der den laufenden Server beherrscht, hilft sie nicht, denn dort liegt
+der Schluessel.
+
+**Wie es arbeitet**
+
+Dateien werden beim Schreiben verschluesselt und beim Lesen entschluesselt.
+Freigaben, Versionen, Papierkorb sowie die Programme fuer Arbeitsplatz und
+Telefon laufen unveraendert weiter; Nutzer merken nichts davon. Zwei Betriebsarten:
+ein Hauptschluessel fuer die ganze Instanz (empfohlen, ohne Zutun der Nutzer)
+oder Schluessel je Konto, abgeleitet aus dem Anmeldepasswort.
+
+**Vor dem Einschalten lesen**
+
+Das Einschalten ist praktisch endgueltig. `occ encryption:decrypt-all` meldet
+Erfolg, laesst Dateiversionen und Papierkorb aber verschluesselt liegen, und
+`occ encryption:disable` verweigert, solange noch eine verschluesselte Datei da
+ist. Der Rueckweg bedeutet deshalb: alle Dateiversionen loeschen und alle
+Papierkoerbe leeren. Entscheiden Sie das vorher, nicht hinterher.
+
+Bestandsdateien werden nicht von allein verschluesselt - dafuer gibt es `occ
+encryption:encrypt-all`. Sichern Sie die Schluesselablage
+(`data/files_encryption`): ohne sie sind verschluesselte Dateien endgueltig
+verloren.
+
+PHP 8.4 fork maintained by BW-Tech GmbH for owncloud.online.
+</description>
 	<name>Default encryption module</name>
 	<licence>AGPL</licence>
 	<author>ownCloud GmbH, modified by BW-Tech GmbH</author>
@@ -21,7 +69,7 @@
 		<admin>admin-encryption</admin>
 	</documentation>
 	<rememberlogin>false</rememberlogin>
-	<version>2.0.5</version>
+	<version>2.0.6</version>
 	<category>security</category>
 	<website>https://owncloud.online</website>
 	<bugs>https://github.com/BWTECH-github/encryption/issues</bugs>
