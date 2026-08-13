@@ -26,8 +26,8 @@ This is a fork of [owncloud/encryption](https://github.com/BWTECH-github/encrypt
 
 ```bash
 cd /var/www/owncloud/apps
-git clone https://github.com/BWTECH-github/owncloud.online.git
-cd owncloud.online   # or the actual checkout if you only want the encryption app
+git clone https://github.com/BWTECH-github/encryption.git
+cd encryption
 composer install --no-dev --optimize-autoloader
 chown -R www-data:www-data .
 sudo -u www-data php /var/www/owncloud/occ app:enable encryption
