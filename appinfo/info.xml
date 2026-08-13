@@ -23,9 +23,9 @@
 	<rememberlogin>false</rememberlogin>
 	<version>2.0.3</version>
 	<category>security</category>
-	<website>https://bw.tech</website>
-	<bugs>https://github.com/BWTECH-github/owncloud.online/issues</bugs>
-	<repository type="git">https://github.com/BWTECH-github/owncloud.online.git</repository>
+	<website>https://owncloud.online</website>
+	<bugs>https://github.com/BWTECH-github/encryption/issues</bugs>
+	<repository type="git">https://github.com/BWTECH-github/encryption.git</repository>
 	<types>
 		<filesystem/>
 	</types>
