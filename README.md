@@ -1,147 +1,361 @@
 # encryption
 
-Server-side encryption module for owncloud.online (PHP 8.4 fork maintained by BW-Tech GmbH for [owncloud.online](https://bw.tech)).
+Serverseitige Verschluesselung fuer owncloud.online. Die App registriert das
+Verschluesselungsmodul `OC_DEFAULT_MODULE` ("Default encryption module") und
+verschluesselt die Inhalte der Dateien, die ueber owncloud.online geschrieben
+werden. Sie ist ein PHP-8.4-Fork des urspruenglich von der ownCloud GmbH
+entwickelten Moduls; die Krypto-Logik ist unveraendert, geaendert wurden
+Plattformanforderungen, Bezeichnungen und Code-Idiome.
 
-This is a fork of [owncloud/encryption](https://github.com/BWTECH-github/encryption) modernized for PHP 8.4 and owncloud.online 11. Encryption logic is preserved — only the platform requirements, branding, and code idioms have changed.
+## Was die App tut
 
-## Features
+- Verschluesselt beim Schreiben den **Inhalt** jeder Datei. Dateinamen,
+  Ordnerstruktur, Freigaben und Datenbankinhalte bleiben unverschluesselt.
+- Verwendet je Datei einen eigenen Dateischluessel. Voreingestellter Cipher
+  ist `AES-256-CTR` (`Crypt::DEFAULT_CIPHER`).
+- Versiegelt den Dateischluessel mit den oeffentlichen Schluesseln aller
+  Berechtigten (`openssl_seal`, `AES-256-CBC`) und legt fuer jeden Berechtigten
+  einen `shareKey` ab. Aeltere, mit RC4 versiegelte Schluessel werden beim
+  Lesen weiterhin akzeptiert.
+- Kennt zwei Betriebsarten: Hauptschluessel und Benutzerschluessel (siehe
+  unten).
+- Bringt fuenf `occ`-Befehle mit, unter anderem zum Neuerzeugen des
+  Hauptschluessels und zum Reparieren der Versionsangabe verschluesselter
+  Dateien.
 
-- AES-256 transparent server-side encryption of files in owncloud.online
-- Master-key based encryption (admin-controlled, no per-user passwords required)
-- Optional recovery key for password-reset scenarios
-- HSM (Hardware Security Module) backend for storing the master private key off-server
-- OCC commands for migration, recovery, and master-key rotation
-- Compatible with files encrypted by upstream owncloud.online encryption 1.5–1.6.x (legacy RC4 fallback for `openssl_seal` payloads)
+Die App verschluesselt nur, was nach dem Einschalten geschrieben wird.
+Bestehende Dateien werden erst durch einen ausdruecklichen Lauf
+(`occ encryption:encrypt-all`) verschluesselt.
 
-## Requirements
+## Voraussetzungen
 
-| Component | Minimum |
-|-----------|---------|
-| owncloud.online Core | 10.12 (max 11) |
-| PHP | 8.4 |
-| OpenSSL | 1.1.x or 3.x with legacy provider enabled (see notes below) |
-| ext-openssl | required |
+| Komponente        | Anforderung                                      |
+|-------------------|--------------------------------------------------|
+| owncloud.online   | 10.12 bis 11 (`appinfo/info.xml`)                |
+| PHP               | 8.4 oder neuer                                    |
+| PHP-Erweiterung   | `openssl`                                         |
+| `secret`          | muss in `config/config.php` gesetzt sein          |
+
+Der Wert `secret` aus `config.php` ist im Hauptschluesselbetrieb das Passwort,
+mit dem der private Hauptschluessel verschluesselt wird
+(`KeyManager::getMasterKeyPassword()`). Geht dieser Wert verloren, sind die
+Daten nicht mehr zu entschluesseln. Sichern Sie `config.php` und die
+Schluesselablage gemeinsam.
 
 ## Installation
 
+Der einfachere Weg ist die Installation ueber den Markt in der
+Administrationsoberflaeche. Manuell:
+
 ```bash
-cd /var/www/owncloud/apps
+cd /var/www/owncloud.online/apps
 git clone https://github.com/BWTECH-github/encryption.git
 cd encryption
-composer install --no-dev --optimize-autoloader
+composer install --no-dev
 chown -R www-data:www-data .
-sudo -u www-data php /var/www/owncloud/occ app:enable encryption
-sudo -u www-data php /var/www/owncloud/occ encryption:enable
-sudo -u www-data php /var/www/owncloud/occ encryption:select-encryption-type masterkey
+sudo -u www-data php8.4 ../../occ app:enable encryption
 ```
 
-If you previously had user-key encryption enabled and want to switch to master-key, run `encryption:migrate-key-storage-format` and `encryption:select-encryption-type masterkey -y` (the `-y` skips the interactive confirmation).
+## Betriebsarten
 
-## Configuration
+### Hauptschluessel
 
-Encryption-related app settings are stored in `oc_appconfig` and can be inspected/modified via `occ config:app:set encryption <key> --value <value>`. Most of these are managed automatically by the OCC commands below; change them manually only when you understand the implication.
+Ein einziges Schluesselpaar fuer die gesamte Instanz. Der private
+Hauptschluessel wird mit dem `secret` aus `config.php` verschluesselt
+abgelegt. Benutzerpasswoerter spielen fuer den Zugriff keine Rolle; ein
+Passwortwechsel oder ein Zuruecksetzen des Passworts beruehrt die
+Verschluesselung nicht. Die App registriert in dieser Betriebsart die
+Passwort-Hooks gar nicht erst (`UserHooks::addHooks()`).
 
-| Key | Values | Description |
-|-----|--------|-------------|
-| `masterKeyId` | string | ID of the active master key (auto-generated, e.g. `master_a1b2c3`) |
-| `recoveryKeyId` | string | ID of the recovery key, if recovery is enabled |
-| `useMasterKey` | `0` / `1` | Whether master-key encryption is active |
-| `recoveryAdminEnabled` | `0` / `1` | Whether the recovery admin feature is on |
-| `crypto.engine` | `internal` \| `hsm` | Cipher engine: in-process (`internal`) or HSM-daemon (`hsm`) |
-| `hsm.url` | URL | HSM daemon endpoint (only when `crypto.engine = hsm`) |
-| `hsm.jwt.secret` | string | Shared JWT secret for HSM daemon authentication |
+Aktiv, wenn der App-Wert `useMasterKey` auf `1` steht. Ist die
+Verschluesselung eingeschaltet und weder `useMasterKey` noch
+`userSpecificKey` gesetzt, setzt die App beim Start selbst `useMasterKey=1`.
 
-Example `config/config.php` snippet for an HSM-backed setup:
+### Benutzerschluessel
+
+Je Benutzer ein Schluesselpaar; der private Schluessel ist mit dem
+Anmeldepasswort verschluesselt. Diese Betriebsart wird nur noch fuer
+bestehende Installationen unterstuetzt: Die Auswahlliste im Administrations-
+panel bietet ausschliesslich "Hauptschluessel" an, und bei gesetztem App-Wert
+`userSpecificKey` blendet das Panel einen Hinweis ein, dass diese Betriebsart
+veraltet ist. Nur in dieser Betriebsart gibt es den
+Wiederherstellungsschluessel und die persoenlichen Verschluesselungs-
+einstellungen.
+
+## Verschluesselung einschalten
+
+Die drei Schritte sind: App aktivieren, Verschluesselung im Kern einschalten,
+Modul als Standardmodul setzen.
+
+```bash
+sudo -u www-data php8.4 occ app:enable encryption
+sudo -u www-data php8.4 occ encryption:enable
+sudo -u www-data php8.4 occ encryption:list-modules
+sudo -u www-data php8.4 occ encryption:set-default-module OC_DEFAULT_MODULE
+sudo -u www-data php8.4 occ encryption:status
+```
+
+`encryption:enable`, `encryption:list-modules`, `encryption:set-default-module`
+und `encryption:status` stammen aus dem Kern von owncloud.online, nicht aus
+dieser App.
+
+Die Betriebsart waehlen Sie unter Einstellungen > Administrator >
+Verschluesselung im Abschnitt "Standard-Verschluesselungs-Modul": Eintrag
+"Hauptschluessel" auswaehlen und "Diesen Modus immer verwenden" bestaetigen.
+Die Schaltflaeche setzt den App-Wert `useMasterKey` auf `1`. Auf der
+Kommandozeile entspricht das:
+
+```bash
+sudo -u www-data php8.4 occ config:app:set encryption useMasterKey --value 1
+```
+
+Nach dem Umschalten muessen sich alle Benutzer neu anmelden, damit ihre
+Schluessel in der Sitzung initialisiert werden.
+
+## Alle Dateien verschluesseln und wieder entschluesseln
+
+Beide Befehle gehoeren zum Kern; die Arbeit erledigen die Klassen
+`EncryptAll` und `DecryptAll` dieser App.
+
+```bash
+sudo -u www-data php8.4 occ encryption:encrypt-all -y
+```
+
+Im Hauptschluesselbetrieb wird der Hauptschluessel geprueft und, falls er noch
+fehlt, erzeugt (`KeyManager::validateMasterKey()`); anschliessend werden die
+Dateien aller Benutzer verschluesselt. Im
+Benutzerschluesselbetrieb erzeugt der Lauf zuvor fuer jeden Benutzer ein
+Schluesselpaar mit einem generierten Passwort und gibt die Passwortliste aus
+oder versendet sie per E-Mail; bestehende Versionen und Dateien im Papierkorb
+werden dabei nicht verschluesselt.
+
+```bash
+sudo -u www-data php8.4 occ encryption:decrypt-all
+sudo -u www-data php8.4 occ encryption:decrypt-all alice -m password
+```
+
+| Argument / Option        | Bedeutung                                      |
+|--------------------------|------------------------------------------------|
+| `user` (Argument)        | nur diesen Benutzer entschluesseln, optional   |
+| `-m, --method`           | `recovery` oder `password`                     |
+| `-c, --continue`         | `yes` oder `no`, Vorgabe `no`                  |
+
+Im Hauptschluesselbetrieb wird kein Passwort benoetigt, der Lauf verwendet den
+Hauptschluessel. Im Benutzerschluesselbetrieb gilt: `password` funktioniert nur
+fuer einen einzelnen Benutzer; fuer alle Benutzer ist ausschliesslich
+`--method recovery` moeglich, und das Passwort des Wiederherstellungs-
+schluessels wird aus der Umgebungsvariablen `OC_RECOVERY_PASSWORD` gelesen.
+
+## Schluesselablage
+
+Die Schluessel liegen im Datenverzeichnis. Wurzel ist standardmaessig das
+Datenverzeichnis selbst; sie laesst sich mit den Kernbefehlen
+`encryption:show-key-storage-root` und `encryption:change-key-storage-root`
+verschieben und steht im App-Wert `encryption_key_storage_root` der App
+`core`.
+
+| Schluessel                     | Ablage                                                                |
+|--------------------------------|-----------------------------------------------------------------------|
+| Hauptschluessel                | `<daten>/files_encryption/OC_DEFAULT_MODULE/master_xxxxxxxx.publicKey` bzw. `.privateKey` |
+| Schluessel fuer oeffentliche Links | `<daten>/files_encryption/OC_DEFAULT_MODULE/pubShare_xxxxxxxx.*`   |
+| Wiederherstellungsschluessel   | `<daten>/files_encryption/OC_DEFAULT_MODULE/recoveryKey_xxxxxxxx.*`   |
+| Benutzerschluessel             | `<daten>/<uid>/files_encryption/OC_DEFAULT_MODULE/<uid>.publicKey` bzw. `.privateKey` |
+| Datei- und Freigabeschluessel  | `<daten>/<uid>/files_encryption/keys/<pfad>/OC_DEFAULT_MODULE/fileKey` und `<empfaenger>.shareKey` |
+
+Bei systemweiten Einhaengepunkten liegen die Datei- und Freigabeschluessel
+nicht unter dem Benutzerverzeichnis, sondern direkt unter
+`<daten>/files_encryption/keys/...`.
+
+Die Kennungen mit Zufallssuffix stehen in den App-Werten `masterKeyId`,
+`publicShareKeyId` und `recoveryKeyId`; sie werden beim ersten Bedarf erzeugt.
+
+## Passwortwechsel und Zuruecksetzen
+
+Im Hauptschluesselbetrieb passiert nichts: Die zustaendigen Hooks werden nur
+registriert, wenn der Hauptschluessel **nicht** aktiv ist.
+
+Im Benutzerschluesselbetrieb gilt:
+
+- **Benutzer aendert das eigene Passwort waehrend einer Sitzung.** Der private
+  Schluessel bleibt derselbe und wird lediglich mit dem neuen Passwort neu
+  verschluesselt.
+- **Administrator setzt ein fremdes Passwort.** Ein neues Schluesselpaar wird
+  nur erzeugt, wenn der Benutzer die Wiederherstellung aktiviert hat und ein
+  Wiederherstellungspasswort mitgegeben wurde, oder wenn der Benutzer noch
+  keine Schluessel oder noch keine Dateien besitzt. Mit
+  Wiederherstellungspasswort werden die Dateischluessel des Benutzers dabei neu
+  verschluesselt.
+- **Ohne Wiederherstellungspasswort** bleibt der private Schluessel mit dem
+  alten Passwort verschluesselt. Der Benutzer sieht dann unter Einstellungen >
+  Persoenlich > Verschluesselung im Abschnitt
+  "owncloud.online-Basisverschluesselungsmodul" den Hinweis "Dein Passwort fuer
+  Deinen privaten Schluessel stimmt nicht mehr mit Deinem Loginpasswort
+  ueberein." und traegt dort unter "Altes Login Passwort" und "Aktuelles
+  Passwort" die beiden Passwoerter ein ("Passwort fuer den privaten Schluessel
+  aktualisieren").
+- **Benutzer wird geloescht.** Der oeffentliche Schluessel des Benutzers und
+  seine Schluessel in alternativen Ablagen werden entfernt.
+
+Den Wiederherstellungsschluessel legt der Administrator im Abschnitt
+"Standard-Verschluesselungs-Modul" an; jeder Benutzer entscheidet unter
+Einstellungen > Persoenlich > Verschluesselung mit
+"Passwortwiederherstellung aktivieren:" ("Aktiviert" / "Deaktiviert") selbst
+darueber. Der Zustand steht im App-Wert
+`recoveryAdminEnabled` und im Benutzerwert `recoveryEnabled` der App
+`encryption`.
+
+## Einstellungen
+
+App-Werte der App `encryption`, les- und schreibbar mit
+`occ config:app:get encryption <schluessel>` und
+`occ config:app:set encryption <schluessel> --value <wert>`. Die meisten Werte
+setzt die App selbst; aendern Sie sie nur, wenn Sie die Folgen kennen.
+
+| Schluessel           | Werte / Vorgabe          | Bedeutung                                            |
+|----------------------|--------------------------|------------------------------------------------------|
+| `useMasterKey`       | `0` / `1`                | Hauptschluesselbetrieb aktiv                          |
+| `userSpecificKey`    | leer / `1`               | veralteter Benutzerschluesselbetrieb                  |
+| `masterKeyId`        | `master_xxxxxxxx`        | Kennung des Hauptschluessels                          |
+| `publicShareKeyId`   | `pubShare_xxxxxxxx`      | Kennung des Schluessels fuer oeffentliche Links       |
+| `recoveryKeyId`      | `recoveryKey_xxxxxxxx`   | Kennung des Wiederherstellungsschluessels             |
+| `recoveryAdminEnabled` | `0` / `1`              | Wiederherstellungsschluessel eingerichtet             |
+| `encryptHomeStorage` | `0` / `1`, Vorgabe `1`   | Hauptspeicher mitverschluesseln; bei `0` nur externe Speicher |
+| `crypto.engine`      | `internal` / `hsm`       | Krypto-Backend, Vorgabe `internal`                    |
+| `hsm.url`            | URL                      | Adresse des HSM-Dienstes                              |
+| `hsm.jwt.secret`     | Zeichenkette             | gemeinsames Geheimnis fuer den HSM-Dienst, Vorgabe `secret` |
+| `hsm.jwt.clockskew`  | Sekunden, Vorgabe `120`  | zulaessige Uhrzeitabweichung beim JWT                 |
+
+Zusaetzlich beruehrt die App zwei Werte der App `core`: `encryption_enabled`
+(`yes` / `no`) setzt sie selbst (`Util::removeEncryptionAppSettings()`,
+`encryption:recreate-master-key`); `encryption_key_storage_root` wird vom Kern
+verwaltet und von der App nur ueber dessen `Util::getKeyStorageRoot()` gelesen.
+
+Werte aus `config/config.php`, die dieses Modul auswertet:
 
 ```php
-'encryption.legacy_format_support' => false,
-'encryption.key_storage_migrated' => 1,
-'encryption_skip_signature_check' => false,
+'secret' => '...',                        // Passwort des Hauptschluessels
+'cipher' => 'AES-256-CTR',                // Vorgabe, siehe unten
+'openssl' => [
+    'private_key_bits' => 4096,           // Vorgabe der App
+],
+'encryption.use_legacy_encoding' => false, // true = base64 statt binaer schreiben
 ```
 
-## OCC commands
+Als `cipher` werden `AES-256-CTR`, `AES-128-CTR`, `AES-256-CFB` und
+`AES-128-CFB` unterstuetzt; bei einem anderen Wert protokolliert die App eine
+Warnung und faellt auf `AES-256-CTR` zurueck. Der Wert `instanceid` wird
+zusaetzlich als Aussteller der JWT an den HSM-Dienst verwendet.
 
-All commands are exposed under the `encryption:` namespace. Run as the web-server user.
+### HSM-Betrieb
+
+Der HSM-Dienst ist ein eigenstaendiger Dienst und nicht Teil dieser App. Die
+App spricht ihn per HTTP an, sobald `hsm.url` gesetzt ist; sie setzt dann beim
+Start selbst `crypto.engine` auf `hsm`.
+
+```bash
+sudo -u www-data php8.4 occ config:app:set encryption hsm.url \
+  --value https://hsm.example.net
+sudo -u www-data php8.4 occ config:app:set encryption hsm.jwt.secret \
+  --value <gemeinsames-geheimnis>
+```
+
+## Kommandozeile
+
+Fuenf Befehle stammen aus dieser App. Fuehren Sie sie als Web-Server-Benutzer
+aus.
 
 ### `encryption:recreate-master-key`
 
-Generate a new master key and re-encrypt every file's per-file key with it.
+Entschluesselt das gesamte Dateisystem, erzeugt einen neuen Hauptschluessel und
+verschluesselt anschliessend wieder alles damit. Bricht mit einem Hinweis ab,
+wenn der Hauptschluesselbetrieb nicht aktiv ist. Alle Benutzer muessen sich
+danach neu anmelden.
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `-y, --yes` | flag | off | Skip the interactive confirmation prompt |
+| Option      | Bedeutung                              |
+|-------------|----------------------------------------|
+| `-y, --yes` | Rueckfrage ueberspringen               |
 
 ```bash
-sudo -u www-data php occ encryption:recreate-master-key -y
+sudo -u www-data php8.4 occ encryption:recreate-master-key -y
 ```
 
 ### `encryption:migrate [user_id...]`
 
-One-time key-storage reorganization to the encryption 2.0 layout. Pass user IDs to migrate only specific users; pass nothing to migrate the system-wide keys.
+Einmalige Umstellung der Schluesselablage auf das Layout von Verschluesselung
+2.0. Ohne Argument werden die systemweiten Schluessel und die Schluessel aller
+Benutzer aller Backends umgestellt, mit Argumenten nur die genannten Benutzer.
 
 ```bash
-sudo -u www-data php occ encryption:migrate            # system keys
-sudo -u www-data php occ encryption:migrate alice bob  # specific users
+sudo -u www-data php8.4 occ encryption:migrate
+sudo -u www-data php8.4 occ encryption:migrate alice bob
+```
+
+### `encryption:fix-encrypted-version <user>`
+
+Prueft die Dateien eines Benutzers und korrigiert die gespeicherte Versions-
+angabe, wenn sich eine Datei wegen einer Signaturpruefung nicht mehr lesen
+laesst. Der Befehl zaehlt die Version zunaechst herunter, danach bis zur
+angegebenen Obergrenze hinauf, und stellt den Ausgangswert wieder her, wenn
+keine Version passt. Freigegebene Dateien muessen beim Eigentuemer repariert
+werden.
+
+| Argument / Option        | Vorgabe        | Bedeutung                          |
+|--------------------------|----------------|------------------------------------|
+| `user` (Argument)        | –              | Benutzerkennung, erforderlich      |
+| `-p, --path`             | alle Dateien   | Einschraenken, z. B. `--path="/Musik"` |
+| `-i, --increment-range`  | `5`            | wie weit die Version erhoeht wird  |
+
+```bash
+sudo -u www-data php8.4 occ encryption:fix-encrypted-version alice \
+  -p "/Dokumente" -i 10
 ```
 
 ### `encryption:hsmdaemon`
 
-Manage the HSM-stored master key (only with `crypto.engine = hsm`).
+Gibt den privaten Hauptschluessel base64-kodiert aus. Erfordert einen
+gesetzten App-Wert `hsm.url`, sonst bricht der Befehl mit `hsm.url not set`
+ab.
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `--export-masterkey` | flag | Export the private master key as base64 |
-| `--import-masterkey=<base64>` | string | Import a previously exported master key |
+| Option               | Bedeutung                                          |
+|----------------------|----------------------------------------------------|
+| `--export-masterkey` | privaten Hauptschluessel base64-kodiert ausgeben   |
+
+Der Befehl deklariert zusaetzlich die Option `--import-masterkey`; sie wird im
+aktuellen Code nicht ausgewertet und bewirkt nichts.
 
 ### `encryption:hsmdaemon:decrypt <ciphertext>`
 
-Decrypt a base64-encoded blob via the HSM daemon — useful for diagnostics.
+Entschluesselt eine base64-kodierte Zeichenkette ueber den HSM-Dienst, zur
+Fehlersuche. Erfordert ebenfalls `hsm.url`.
 
-| Argument / Option | Required | Description |
-|-------------------|----------|-------------|
-| `decrypt` (arg) | yes | Base64-encoded ciphertext to decrypt |
-| `--username=<uid>` | no | User context (prompts for password) |
-| `--keyId=<id>` | no | Specific keyId to decrypt with |
+| Argument / Option   | Bedeutung                                             |
+|---------------------|-------------------------------------------------------|
+| `decrypt` (Argument)| base64-kodierter Geheimtext, erforderlich             |
+| `--username`        | Benutzer, dessen Schluessel gilt; fragt das Passwort ab |
+| `--keyId`           | Kennung des zu verwendenden Schluessels                |
 
-### `encryption:fix-encrypted-version <user>`
+## Fehlersuche
 
-Repair the persisted "encrypted-version" metadata of a user's files when downloads start failing with signature errors after restores or backups.
+| Symptom | Ursache | Abhilfe |
+|---------|---------|---------|
+| Panel meldet "Die Verschluesselung-App ist aktiviert, aber Deine Schluessel sind nicht initialisiert." | Die Schluessel wurden in dieser Sitzung nicht initialisiert | Abmelden und neu anmelden |
+| Nutzer meldet "Dein Passwort fuer Deinen privaten Schluessel stimmt nicht mehr mit Deinem Loginpasswort ueberein." | Passwort wurde ohne Wiederherstellungsschluessel fremd gesetzt | Unter Persoenlich > Verschluesselung "Altes Login Passwort" und "Aktuelles Passwort" eintragen |
+| Download bricht mit Signaturfehler ab | Versionsangabe der Datei passt nicht zum Inhalt, etwa nach einer Ruecksicherung | `occ encryption:fix-encrypted-version <benutzer>` |
+| `MultiKeyDecryptException: multikeydecrypt with share key failed` | Der Schluessel wurde mit RC4 versiegelt, OpenSSL 3 fuehrt RC4 nur im Legacy-Provider | Legacy-Provider in der OpenSSL-Konfiguration bereitstellen oder die Dateien mit `encryption:recreate-master-key` neu verschluesseln |
+| `Can not get secret from ownCloud instance` | `secret` fehlt in `config/config.php` | Wert wiederherstellen; ohne ihn ist der Hauptschluessel nicht zu oeffnen |
+| `Master key is not enabled.` bei `recreate-master-key` | App-Wert `useMasterKey` steht nicht auf `1` | Betriebsart im Panel waehlen oder `config:app:set encryption useMasterKey --value 1` |
+| `hsm.url not set` | HSM-Befehl ohne konfigurierten Dienst aufgerufen | `hsm.url` setzen oder den Befehl nicht verwenden |
+| Log: "Unsupported cipher (…) defined in config.php supported. Falling back to AES-256-CTR" | `cipher` in `config.php` wird nicht unterstuetzt | einen der vier unterstuetzten Cipher eintragen |
+| Schluesselpaar laesst sich nicht erzeugen, OpenSSL-Fehler im Log | OpenSSL akzeptiert die 4096 Bit oder den Konfigurationspfad nicht | `openssl` in `config.php` anpassen |
+| Dateien im Hauptspeicher bleiben unverschluesselt | `encryptHomeStorage` steht auf `0` | Wert auf `1` setzen, danach `occ encryption:encrypt-all` |
 
-| Argument / Option | Required | Default | Description |
-|-------------------|----------|---------|-------------|
-| `user` (arg) | yes | — | User ID whose files to scan |
-| `-p, --path=<path>` | no | all files | Limit to a sub-path, e.g. `--path="/Music/Artist"` |
-| `-i, --increment-range=<n>` | no | `5` | Search +/- n versions when locating the right one |
+## Herkunft
 
-```bash
-sudo -u www-data php occ encryption:fix-encrypted-version alice -p "/Documents/Important" -i 10
-```
+Der urspruengliche Code stammt von der ownCloud GmbH und steht unter der
+AGPL-3.0 (siehe `LICENSE`). Dieser Fork wird von der BW-Tech GmbH fuer
+owncloud.online gepflegt und steht unter derselben Lizenz.
 
-## Daily usage
-
-For most installations there is nothing to do day-to-day — encryption is transparent. Watch the owncloud.online log (`config/data/owncloud.log`) for `OCA\Encryption` entries. Typical events:
-
-- New file uploaded → silently encrypted, key derived from master key, share-keys generated for any users with access
-- File shared → share-key for the new recipient added, no re-encryption of file body
-- User password changed → only personal recovery key (if used) re-wrapped; master-key files unaffected
-- User deleted → user's share-keys are cleaned up by owncloud.online Core hooks; file bodies remain readable via master key
-
-## Troubleshooting
-
-| Symptom | Likely cause | Action |
-|---------|--------------|--------|
-| `MultiKeyDecryptException: multikeydecrypt with share key failed` | OpenSSL 3 retired the RC4 cipher used by legacy `openssl_seal` payloads | Enable the OpenSSL 3 legacy provider (see OpenSSL 3.0 wiki §6.2 *Providers*) **or** verify the file was re-keyed with `encryption:recreate-master-key` after upgrading |
-| Files refuse to download with `Bad Signature` | Encrypted-version metadata drifted (after a restore from backup) | Run `occ encryption:fix-encrypted-version <user>` |
-| `PrivateKeyMissingException` for a user | Master-key migration was not run after switching from user-key to master-key | Run `occ encryption:migrate-key-storage-format` then `occ encryption:migrate` |
-| `openssl_get_privatekey` returns false | OpenSSL config rejects the RSA size or hash | Check `openssl_config_path` in `config.php`; the bundled config asks for 4096-bit RSA which some hardened OpenSSL builds reject |
-| HSM commands hang | `hsm.url` unreachable or `hsm.jwt.secret` mismatched | Verify with `curl -i $(occ config:app:get encryption hsm.url)/health` and that the JWT secret matches both ends |
-| `app encryption is not compatible with this server` after Core upgrade | `appinfo/info.xml` `max-version` exceeded | Ensure you are on a fork build that lists `max-version="11"` (this one does) |
-
-> **Note on OpenSSL 3:** With the December-2021 OpenSSL 1.x → 3.x transition, ciphers retired as legacy (notably RC4 used inside `openssl_seal` for older encrypted-key blobs) stop working unless the legacy provider is enabled. This fork uses `aes-256-ecb` for *new* seal operations and falls back to RC4 only when reading legacy payloads. If you have existing files encrypted by upstream 1.5/1.6 you must keep the legacy provider available until those files have been re-keyed.
-
-## Attribution
-
-- Original code © ownCloud GmbH and the owncloud.online encryption authors. Licensed under [AGPL-3.0](LICENSE).
-- PHP 8.4 fork and owncloud.online branding © BW-Tech GmbH. Same AGPL-3.0 license.
-- Upstream: <https://github.com/BWTECH-github/encryption>
-- This fork: <https://github.com/BWTECH-github/owncloud.online>
+- Anwendungsseite: <https://owncloud.online>
+- Dokumentation: <https://docs.owncloud.online>
+- Quellcode und Fehlermeldungen:
+  <https://github.com/BWTECH-github/encryption>
