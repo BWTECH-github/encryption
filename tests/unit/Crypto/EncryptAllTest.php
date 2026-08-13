@@ -430,7 +430,8 @@ class EncryptAllTest extends TestCase {
 			->setMethods(['setupUserFS'])
 			->getMock();
 
-		$result = $this->invokePrivate($encryptAll, 'encryptFile', ["/${userName}/files/bar.txt"]);
+		// "${var}" ist seit PHP 8.2 abgemahnt; "{$var}" ist gleichbedeutend.
+		$result = $this->invokePrivate($encryptAll, 'encryptFile', ["/{$userName}/files/bar.txt"]);
 		$this->assertTrue($result);
 
 		$view1 = new View('/');
