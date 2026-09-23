@@ -6,16 +6,12 @@
 <form id="ocDefaultEncryptionModule" class="section">
 	<h2 class="app-name"><?php p($l->t('owncloud.online basic encryption module')); ?></h2>
 
-	<?php if (empty($_["encryptionEnabled"])): ?>
-		<p>
-			<em><?php p($l->t("Server-side encryption is not enabled. There is nothing to configure here.")); ?></em>
-		</p>
-
-	<?php elseif ($_["initialized"] === \OCA\Encryption\Session::NOT_INITIALIZED): ?>
-
-	<?php p($l->t("Encryption App is enabled, but your keys are not initialized. Please log-out and log-in again.")); ?>
-
-	<?php elseif ($_["initialized"] === \OCA\Encryption\Session::INIT_EXECUTED): ?>
+	<?php /* Das Formular für das Schlüsselkennwort kommt zuerst: die App
+	   registriert ihre Hooks über isReady(), nicht über den Schalter - auch bei
+	   ausgeschalteter Verschlüsselung kann ein Nutzer noch verschlüsselte
+	   Dateien und einen nicht mehr passenden Schlüssel haben (Gegen-Review
+	   23.09.2026). Erst danach der Hinweis „nicht eingeschaltet“. */ ?>
+	<?php if ($_["initialized"] === \OCA\Encryption\Session::INIT_EXECUTED): ?>
 		<p>
 			<span class="warning">
 				<em><?php p($l->t("Your private key password no longer matches your log-in password.")); ?></em>
@@ -45,6 +41,15 @@
 			</button>
 			<span class="msg"></span>
 		</p>
+
+	<?php elseif (empty($_["encryptionEnabled"])): ?>
+		<p>
+			<em><?php p($l->t("Server-side encryption is not enabled. There is nothing to configure here.")); ?></em>
+		</p>
+
+	<?php elseif ($_["initialized"] === \OCA\Encryption\Session::NOT_INITIALIZED): ?>
+
+	<?php p($l->t("Encryption App is enabled, but your keys are not initialized. Please log-out and log-in again.")); ?>
 
 	<?php elseif ($_["recoveryEnabled"] && $_["privateKeySet"] && $_["initialized"] === \OCA\Encryption\Session::INIT_SUCCESSFUL): ?>
 		<br />
