@@ -6,7 +6,12 @@
 <form id="ocDefaultEncryptionModule" class="section">
 	<h2 class="app-name"><?php p($l->t('owncloud.online basic encryption module')); ?></h2>
 
-	<?php if ($_["initialized"] === \OCA\Encryption\Session::NOT_INITIALIZED): ?>
+	<?php if (empty($_["encryptionEnabled"])): ?>
+		<p>
+			<em><?php p($l->t("Server-side encryption is not enabled. There is nothing to configure here.")); ?></em>
+		</p>
+
+	<?php elseif ($_["initialized"] === \OCA\Encryption\Session::NOT_INITIALIZED): ?>
 
 	<?php p($l->t("Encryption App is enabled, but your keys are not initialized. Please log-out and log-in again.")); ?>
 

@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [2.0.7] - 2026-09-23
+
+### Fixed
+
+- Persönliche Einstellungen: Ist die serverseitige Verschlüsselung nicht eingeschaltet, sagt die Sektion das jetzt. Vorher stand dort „Die serverseitige Verschlüsselung ist aktiv und Deine Dateien werden transparent verschlüsselt“ – eine falsche Sicherheitsaussage.
+
 ## [2.0.6] - 2026-08-13
 
 ### Changed

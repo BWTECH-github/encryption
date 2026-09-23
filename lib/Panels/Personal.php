@@ -42,7 +42,8 @@ class Personal implements ISettings {
 		protected readonly IL10N $l,
 		protected readonly IUserManager $userManager,
 		protected readonly ISession $session,
-		protected readonly IStorage $encKeyStorage
+		protected readonly IStorage $encKeyStorage,
+		protected readonly \OCP\Encryption\IManager $encryptionManager
 	) {
 	}
 
@@ -63,6 +64,12 @@ class Personal implements ISettings {
 	public function getPanel() {
 		$session = new \OCA\Encryption\Session($this->session);
 		$template = new Template('encryption', 'settings-personal');
+		// App eingeschaltet, serverseitige Verschlüsselung aber nicht: dann
+		// gibt es hier nichts einzustellen. Vorher lief die Vorlage in den
+		// Zweig „Verschlüsselung ist aktiv, Dateien werden transparent
+		// verschlüsselt“ – eine falsche Sicherheitsaussage an Endnutzer
+		// (Befund Server-Abnahme 23.09.2026).
+		$template->assign('encryptionEnabled', $this->encryptionManager->isEnabled());
 		$crypt = new \OCA\Encryption\Crypto\Crypt(
 			$this->logger,
 			$this->userSession,
