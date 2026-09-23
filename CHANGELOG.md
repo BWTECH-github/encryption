@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [2.0.8] - 2026-09-23
+
+### Fixed
+
+- Persönliche Sektion: Das Formular „Schlüsselkennwort aktualisieren“ erscheint wieder vor dem Hinweis „nicht eingeschaltet“. Auch bei ausgeschalteter Verschlüsselung kann ein Nutzer noch verschlüsselte Dateien und einen nicht mehr passenden Schlüssel haben (die App hängt an isReady(), nicht am Schalter).
+
 ## [2.0.7] - 2026-09-23
 
 ### Fixed
