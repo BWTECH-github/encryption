@@ -42,8 +42,7 @@ class Personal implements ISettings {
 		protected readonly IL10N $l,
 		protected readonly IUserManager $userManager,
 		protected readonly ISession $session,
-		protected readonly IStorage $encKeyStorage,
-		protected readonly \OCP\Encryption\IManager $encryptionManager
+		protected readonly IStorage $encKeyStorage
 	) {
 	}
 
@@ -68,8 +67,12 @@ class Personal implements ISettings {
 		// gibt es hier nichts einzustellen. Vorher lief die Vorlage in den
 		// Zweig „Verschlüsselung ist aktiv, Dateien werden transparent
 		// verschlüsselt“ – eine falsche Sicherheitsaussage an Endnutzer
-		// (Befund Server-Abnahme 23.09.2026).
-		$template->assign('encryptionEnabled', $this->encryptionManager->isEnabled());
+		// (Befund Server-Abnahme 23.09.2026). Der Manager kommt über den
+		// Server, nicht über den Konstruktor: OCP\Encryption\IManager ist im
+		// App-Container nicht registriert, der Kern fiele dann auf den
+		// Server-Container zurück und könnte das Panel gar nicht mehr bauen
+		// („Could not resolve OCP\IL10N“, Sektion leer).
+		$template->assign('encryptionEnabled', \OC::$server->getEncryptionManager()->isEnabled());
 		$crypt = new \OCA\Encryption\Crypto\Crypt(
 			$this->logger,
 			$this->userSession,
