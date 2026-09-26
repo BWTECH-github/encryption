@@ -413,6 +413,23 @@ class EncryptionTest extends TestCase {
 		$this->instance->decrypt('abc');
 	}
 
+	/**
+	 * Der Kern hängt beim letzten Block "end" an die Position; ownCloud-10-Bestand
+	 * ist damit signiert. Der Zusatz muss bis zur Signaturprüfung durchkommen.
+	 */
+	public function testDecryptPassesPositionWithEndSuffix() {
+		self::invokePrivate($this->instance, 'fileKey', ['dateischluessel']);
+		self::invokePrivate($this->instance, 'cipher', ['AES-256-CTR']);
+		self::invokePrivate($this->instance, 'version', [3]);
+
+		$this->cryptMock->expects($this->once())
+			->method('symmetricDecryptFileContent')
+			->with('block', 'dateischluessel', 'AES-256-CTR', 3, '10end', true)
+			->willReturn('klartext');
+
+		$this->assertSame('klartext', $this->instance->decrypt('block', '10end'));
+	}
+
 	public function testPrepareDecryptAll() {
 		/** @var \Symfony\Component\Console\Input\InputInterface $input */
 		$input = $this->createMock('Symfony\Component\Console\Input\InputInterface');

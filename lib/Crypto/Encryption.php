@@ -214,6 +214,10 @@ class Encryption implements IEncryptionModule {
 				self::$rememberVersion[$this->stripPartFileExtension($path)] = $this->version + 1;
 			}
 			if (!empty($this->writeCache)) {
+				// Signiert wird weiter mit der Position als Zahl (ohne "end"), wie
+				// alle owncloud.online-Stände seit 2.0.0 - sonst könnten ältere
+				// Stände neu geschriebene Dateien nicht mehr lesen. Der Leser
+				// akzeptiert beide Formen (Crypt::checkBlockSignature()).
 				$result = $this->crypt->symmetricEncryptFileContent($this->writeCache, $this->fileKey, $this->version + 1, (int)$position);
 				if ($result === false) {
 					$result = '';
@@ -326,7 +330,10 @@ class Encryption implements IEncryptionModule {
 			throw new DecryptionFailedException($msg, $hint);
 		}
 
-		return $this->crypt->symmetricDecryptFileContent($data, $this->fileKey, $this->cipher, $this->version, (int)$position, !$this->useLegacyEncoding);
+		// Position unverändert weitergeben: beim letzten Block trägt sie den
+		// Zusatz "end", mit dem ownCloud-Bestand signiert ist (siehe
+		// Crypt::checkBlockSignature()).
+		return $this->crypt->symmetricDecryptFileContent($data, $this->fileKey, $this->cipher, $this->version, $position, !$this->useLegacyEncoding);
 	}
 
 	/**

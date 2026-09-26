@@ -90,6 +90,14 @@ class Crypt {
 	public const SEALED_FORMAT_LEGACY = 0x01;
 
 	/**
+	 * Länge des Umschlagschlüssels alter Umschläge: openssl_seal() mit RC4
+	 * (encryption <= 1.6, ownCloud 10) erzeugt 16 Byte, mit aes-256-ecb
+	 * (encryption 1.7, ownCloud 11 upstream) 32 Byte.
+	 */
+	private const LEGACY_SEAL_KEY_LENGTH_RC4 = 16;
+	private const LEGACY_SEAL_KEY_LENGTH_AES256 = 32;
+
+	/**
 	 * Writing file with legacy base64 encoding is still supported for testing purposes
 	 */
 	private readonly bool $useLegacyEncoding;
@@ -507,22 +515,17 @@ class Crypt {
 	 * @param string $passPhrase
 	 * @param string $cipher
 	 * @param int $version
-	 * @param int $position
+	 * @param int|string $position Blocknummer; beim letzten Block mit Zusatz "end" (z. B. "0end")
 	 * @param bool $binaryEncode
 	 * @return string
 	 * @throws DecryptionFailedException
 	 * @throws HintException
 	 */
-	public function symmetricDecryptFileContent(string $keyFileContents, string $passPhrase, string $cipher = self::DEFAULT_CIPHER, int $version = 0, int $position = 0, bool $binaryEncode = false): string {
+	public function symmetricDecryptFileContent(string $keyFileContents, string $passPhrase, string $cipher = self::DEFAULT_CIPHER, int $version = 0, int|string $position = 0, bool $binaryEncode = false): string {
 		$catFile = $this->splitMetaData($keyFileContents, $cipher);
 
 		if ($catFile['signature'] !== false) {
-			try {
-				$this->checkSignature($catFile['encrypted'], $passPhrase . $version . "-" . $position, $catFile['signature']);
-			} catch (HintException $e) {
-				// Check legacy format...
-				$this->checkSignature($catFile['encrypted'], $passPhrase . $version . $position, $catFile['signature']);
-			}
+			$this->checkBlockSignature($catFile['encrypted'], $catFile['signature'], $passPhrase, $version, (string)$position);
 		}
 
 		return $this->decrypt(
@@ -535,18 +538,38 @@ class Crypt {
 	}
 
 	/**
-	 * check for valid signature
+	 * Signatur eines Blocks prüfen.
 	 *
-	 * @param string $data
-	 * @param string $passPhrase
-	 * @param string $expectedSignature
+	 * Der Kern übergibt beim letzten Block die Position mit Zusatz "end"
+	 * (Stream\Encryption::getPosition(), z. B. "0end"). Im Umlauf sind drei
+	 * Schreibweisen der signierten Position:
+	 * - "<version>-<n>end": ownCloud (encryption <= 1.7) - Bestand aus einem
+	 *   Umzug per Datenbank und Datenverzeichnis,
+	 * - "<version>-<n>": owncloud.online encryption 2.x signiert die Position
+	 *   als Zahl (Encryption::end()/encrypt()), der Zusatz "end" fällt weg,
+	 * - "<version><n>…" ohne Bindestrich: sehr alte Versionen.
+	 * Akzeptiert wird jede davon; neue Blöcke werden weiter als Zahl signiert
+	 * (siehe Encryption::end()), damit ältere owncloud.online-Stände sie lesen.
+	 *
 	 * @throws HintException
 	 */
-	private function checkSignature(string $data, string $passPhrase, string $expectedSignature): void {
-		$signature = $this->createSignature($data, $passPhrase);
-		if (!\hash_equals($expectedSignature, $signature)) {
-			throw new HintException('Bad Signature', $this->l->t('Bad Signature'));
+	private function checkBlockSignature(string $data, string $expectedSignature, string $passPhrase, int $version, string $position): void {
+		$numericPosition = (string)(int)$position;
+		$candidates = [$version . '-' . $position];
+		if ($numericPosition !== $position) {
+			$candidates[] = $version . '-' . $numericPosition;
 		}
+		$candidates[] = $version . $position;
+		if ($numericPosition !== $position) {
+			$candidates[] = $version . $numericPosition;
+		}
+
+		foreach ($candidates as $suffix) {
+			if (\hash_equals($expectedSignature, $this->createSignature($data, $passPhrase . $suffix))) {
+				return;
+			}
+		}
+		throw new HintException('Bad Signature', $this->l->t('Bad Signature'));
 	}
 
 	/**
@@ -717,7 +740,9 @@ class Crypt {
 	 * Decrypt data encrypted with openssl_seal
 	 *
 	 * PHP 8.4 requires explicit cipher and IV parameters for openssl_open.
-	 * This method handles both new format (with IV) and legacy format (RC4).
+	 * This method handles the new format (with IV) and the formats of the
+	 * predecessor apps (RC4 from encryption <= 1.6, AES-256-ECB from 1.7),
+	 * see multiKeyDecryptLegacy().
 	 *
 	 * @param string $encKeyFile
 	 * @param string $shareKey
@@ -811,10 +836,21 @@ class Crypt {
 	}
 
 	/**
-	 * Decrypt using legacy format (RC4, no IV) for backward compatibility
+	 * Umschläge ohne Versionsbyte öffnen - so haben die Vorgänger-Apps den
+	 * Dateischlüssel versiegelt:
 	 *
-	 * For files encrypted with PHP 7.x, we need to use RC4 (the old default).
-	 * Note: RC4 is deprecated but necessary for backward compatibility.
+	 * - encryption <= 1.6.x (ownCloud 10): openssl_seal() ohne Cipher-Argument,
+	 *   also RC4 mit 128-Bit-Umschlagschlüssel.
+	 * - encryption 1.7.x (ownCloud 11 von upstream): openssl_seal(..., 'aes-256-ecb')
+	 *   mit 256-Bit-Umschlagschlüssel.
+	 *
+	 * openssl_open(..., 'RC4') scheitert unter OpenSSL 3 ohne geladenen
+	 * Legacy-Provider ("digital envelope routines::unsupported") - und den laden
+	 * Standardinstallationen nicht. Jede aus ownCloud 10 übernommene
+	 * verschlüsselte Datei wäre damit unlesbar. Deshalb wird der
+	 * Umschlagschlüssel hier selbst per RSA (PKCS#1 v1.5, wie openssl_seal)
+	 * geöffnet; seine Länge verrät das Verfahren eindeutig, und RC4 wird in PHP
+	 * gerechnet, unabhängig von der OpenSSL-Konfiguration des Servers.
 	 *
 	 * @param string $encKeyFile
 	 * @param string $shareKey
@@ -823,21 +859,68 @@ class Crypt {
 	 * @throws MultiKeyDecryptException
 	 */
 	private function multiKeyDecryptLegacy(string $encKeyFile, string $shareKey, $privateKey): string {
-		// For legacy files encrypted with PHP 7.x, we need to use RC4 (the old default)
-		// RC4 doesn't require an IV
-		$result = \openssl_open(
-			$encKeyFile,
-			$plainContent,
-			$shareKey,
-			$privateKey,
-			'RC4'
-		);
-
-		if ($result === false) {
-			throw new MultiKeyDecryptException('multikeydecrypt with share key failed: ' . \openssl_error_string());
+		$envelopeKey = '';
+		if (!\openssl_private_decrypt($shareKey, $envelopeKey, $privateKey, OPENSSL_PKCS1_PADDING)) {
+			throw new MultiKeyDecryptException('multikeydecrypt with share key failed: ' . $this->drainOpenSslErrors());
 		}
 
-		return $plainContent;
+		switch (\strlen($envelopeKey)) {
+			case self::LEGACY_SEAL_KEY_LENGTH_RC4:
+				$this->logger->debug('Opened legacy RC4 sealed file key (encryption <= 1.6)', ['app' => 'encryption']);
+				return self::rc4($envelopeKey, $encKeyFile);
+			case self::LEGACY_SEAL_KEY_LENGTH_AES256:
+				$plainContent = \openssl_decrypt($encKeyFile, 'aes-256-ecb', $envelopeKey, OPENSSL_RAW_DATA);
+				if ($plainContent === false) {
+					throw new MultiKeyDecryptException('multikeydecrypt with share key failed: ' . $this->drainOpenSslErrors());
+				}
+				$this->logger->debug('Opened legacy AES-256-ECB sealed file key (encryption 1.7)', ['app' => 'encryption']);
+				return $plainContent;
+			default:
+				// Falscher privater Schlüssel oder beschädigter Umschlag: kein
+				// bekanntes Verfahren nutzt diese Schlüssellänge.
+				throw new MultiKeyDecryptException('multikeydecrypt with share key failed: unexpected envelope key length ' . \strlen($envelopeKey));
+		}
+	}
+
+	/**
+	 * RC4 (ARCFOUR) - nur zum Lesen alter Umschläge, nie zum Schreiben.
+	 *
+	 * @param string $key Umschlagschlüssel
+	 * @param string $data Chiffrat
+	 * @return string Klartext
+	 */
+	private static function rc4(string $key, string $data): string {
+		$state = \range(0, 255);
+		$keyLength = \strlen($key);
+		$j = 0;
+		for ($i = 0; $i < 256; $i++) {
+			$j = ($j + $state[$i] + \ord($key[$i % $keyLength])) & 0xFF;
+			[$state[$i], $state[$j]] = [$state[$j], $state[$i]];
+		}
+
+		$i = 0;
+		$j = 0;
+		$result = '';
+		$dataLength = \strlen($data);
+		for ($n = 0; $n < $dataLength; $n++) {
+			$i = ($i + 1) & 0xFF;
+			$j = ($j + $state[$i]) & 0xFF;
+			[$state[$i], $state[$j]] = [$state[$j], $state[$i]];
+			$result .= $data[$n] ^ \chr($state[($state[$i] + $state[$j]) & 0xFF]);
+		}
+		return $result;
+	}
+
+	/**
+	 * Alle anstehenden OpenSSL-Fehler lesen - die Warteschlange hält sonst
+	 * Meldungen früherer Aufrufe fest und die Fehlermeldung wird irreführend.
+	 */
+	private function drainOpenSslErrors(): string {
+		$errors = [];
+		while (($error = \openssl_error_string()) !== false) {
+			$errors[] = $error;
+		}
+		return $errors === [] ? 'unknown error' : \implode('; ', $errors);
 	}
 
 	/**

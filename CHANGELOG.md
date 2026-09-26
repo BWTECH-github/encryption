@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [2.0.9] - 2026-09-26
+
+### Fixed
+
+- Übernahme aus ownCloud 10/11: Dateischlüssel, die die Vorgänger-App versiegelt hat, lassen sich wieder öffnen. encryption <= 1.6 (ownCloud 10) versiegelte mit RC4, encryption 1.7 (ownCloud 11) mit AES-256-ECB. RC4 bietet OpenSSL 3 ohne Legacy-Provider nicht mehr an, AES-256-ECB wurde gar nicht versucht - nach einem Umzug per Datenbank und Datenverzeichnis war jede verschlüsselte Datei unlesbar („Encryption not ready: multikeydecrypt with share key failed: … unsupported“, HTTP 403). Der Umschlagschlüssel wird jetzt selbst per RSA geöffnet, seine Länge wählt das Verfahren, RC4 wird in PHP gerechnet. Neue Umschläge bleiben im bisherigen Format (AES-256-CBC mit IV).
+- Übernahme aus ownCloud 10/11: Der letzte Block jeder von ownCloud geschriebenen Datei besteht die Signaturprüfung wieder („Bad Signature“). Der Kern hängt beim letzten Block „end“ an die Position; ownCloud signiert damit, diese App wandelte die Position seit der PHP-8.4-Umstellung vor dem Prüfen in eine Zahl und schnitt den Zusatz ab. Die Prüfung akzeptiert jetzt beide Schreibweisen (mit und ohne „end“) sowie die alte ohne Bindestrich. Geschrieben wird unverändert mit der Zahl, damit ältere owncloud.online-Stände neue Dateien weiter lesen; auf die upstream-Schreibweise zurückstellen lässt sich das erst, wenn überall mindestens diese Version läuft.
+
 ## [2.0.8] - 2026-09-23
 
 ### Fixed
