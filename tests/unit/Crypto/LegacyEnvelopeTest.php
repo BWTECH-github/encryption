@@ -6,15 +6,15 @@ declare(strict_types=1);
  * @copyright Copyright (c) 2026, BW-Tech GmbH
  * @license AGPL-3.0
  *
- * Übernahme aus ownCloud 10 / 11: Dateischlüssel, die die Vorgänger-Apps
+ * Übernahme von Servern 10.x / 11: Dateischlüssel, die die Vorgänger-Apps
  * versiegelt haben, müssen sich öffnen lassen - auch wenn OpenSSL 3 kein RC4
  * mehr anbietet.
  *
  * Die Umschläge in fixtures/legacy-envelopes.json sind echte openssl_seal()-
  * Ausgaben, erzeugt mit PHP 7.4 + OpenSSL-Legacy-Provider genau so, wie es die
  * Vorgänger tun:
- *  - rc4_*: encryption <= 1.6.1 (ownCloud 10): openssl_seal() ohne Cipher = RC4
- *  - ecb_*: encryption 1.7.x (ownCloud 11 upstream): openssl_seal(..., 'aes-256-ecb')
+ *  - rc4_*: encryption <= 1.6.1 (Server 10.x): openssl_seal() ohne Cipher = RC4
+ *  - ecb_*: encryption 1.7.x (Upstream-Server 11): openssl_seal(..., 'aes-256-ecb')
  * Empfänger sind wie im Master-Key-Betrieb zwei Schlüssel (master, pubShare).
  */
 

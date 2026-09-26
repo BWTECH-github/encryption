@@ -414,7 +414,7 @@ class EncryptionTest extends TestCase {
 	}
 
 	/**
-	 * Der Kern hängt beim letzten Block "end" an die Position; ownCloud-10-Bestand
+	 * Der Kern hängt beim letzten Block "end" an die Position; der Bestand von 10.x-Servern
 	 * ist damit signiert. Der Zusatz muss bis zur Signaturprüfung durchkommen.
 	 */
 	public function testDecryptPassesPositionWithEndSuffix() {

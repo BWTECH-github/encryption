@@ -331,7 +331,7 @@ class Encryption implements IEncryptionModule {
 		}
 
 		// Position unverändert weitergeben: beim letzten Block trägt sie den
-		// Zusatz "end", mit dem ownCloud-Bestand signiert ist (siehe
+		// Zusatz "end", mit dem der Bestand der Vorgänger-App signiert ist (siehe
 		// Crypt::checkBlockSignature()).
 		return $this->crypt->symmetricDecryptFileContent($data, $this->fileKey, $this->cipher, $this->version, $position, !$this->useLegacyEncoding);
 	}

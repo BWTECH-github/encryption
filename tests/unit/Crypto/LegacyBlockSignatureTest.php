@@ -6,16 +6,16 @@ declare(strict_types=1);
  * @copyright Copyright (c) 2026, BW-Tech GmbH
  * @license AGPL-3.0
  *
- * Übernahme aus ownCloud 10: Datenblöcke, die die Vorgänger-App signiert hat,
+ * Übernahme von 10.x-Servern: Datenblöcke, die die Vorgänger-App signiert hat,
  * müssen die Signaturprüfung bestehen.
  *
  * Der Kern übergibt beim letzten Block die Position mit Zusatz "end" (z. B.
- * "10end"). ownCloud (encryption <= 1.7) signiert mit diesem Zusatz,
+ * "10end"). Die Vorgänger-App (encryption <= 1.7) signiert mit diesem Zusatz,
  * owncloud.online encryption 2.x signiert die Position als Zahl.
  *
  * fixtures/encrypted-blocks.json enthält echte letzte Blöcke samt
  * Dateischlüssel und Version:
- *  - owncloud10_*: geschrieben von ownCloud 10.16.2 / encryption 1.6.1
+ *  - owncloud10_*: geschrieben von Server 10.16.2 / encryption 1.6.1
  *  - oco208_*: geschrieben von owncloud.online encryption 2.0.8
  */
 
@@ -57,8 +57,8 @@ class LegacyBlockSignatureTest extends TestCase {
 
 	public function blockProvider(): array {
 		return [
-			'ownCloud 10, ein Block ("0end")' => ['owncloud10_single'],
-			'ownCloud 10, letzter von 11 Blöcken ("10end")' => ['owncloud10_multi'],
+			'Server 10.x, ein Block ("0end")' => ['owncloud10_single'],
+			'Server 10.x, letzter von 11 Blöcken ("10end")' => ['owncloud10_multi'],
 			'owncloud.online 2.0.8, ein Block' => ['oco208_single'],
 			'owncloud.online 2.0.8, letzter von 12 Blöcken' => ['oco208_multi'],
 		];
@@ -84,7 +84,7 @@ class LegacyBlockSignatureTest extends TestCase {
 
 	/**
 	 * Ausgangslage vor der Korrektur: mit der Position als Zahl (Zusatz "end"
-	 * abgeschnitten) scheitert jeder letzte Block aus ownCloud 10.
+	 * abgeschnitten) scheitert jeder letzte Block von 10.x-Servern.
 	 */
 	public function testOwncloud10BlockNeedsEndSuffix(): void {
 		$f = $this->fixture['owncloud10_multi'];

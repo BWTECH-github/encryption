@@ -91,8 +91,8 @@ class Crypt {
 
 	/**
 	 * Länge des Umschlagschlüssels alter Umschläge: openssl_seal() mit RC4
-	 * (encryption <= 1.6, ownCloud 10) erzeugt 16 Byte, mit aes-256-ecb
-	 * (encryption 1.7, ownCloud 11 upstream) 32 Byte.
+	 * (encryption <= 1.6, Server 10.x) erzeugt 16 Byte, mit aes-256-ecb
+	 * (encryption 1.7, Upstream-Server 11) 32 Byte.
 	 */
 	private const LEGACY_SEAL_KEY_LENGTH_RC4 = 16;
 	private const LEGACY_SEAL_KEY_LENGTH_AES256 = 32;
@@ -543,7 +543,7 @@ class Crypt {
 	 * Der Kern übergibt beim letzten Block die Position mit Zusatz "end"
 	 * (Stream\Encryption::getPosition(), z. B. "0end"). Im Umlauf sind drei
 	 * Schreibweisen der signierten Position:
-	 * - "<version>-<n>end": ownCloud (encryption <= 1.7) - Bestand aus einem
+	 * - "<version>-<n>end": Vorgänger-App (encryption <= 1.7) - Bestand aus einem
 	 *   Umzug per Datenbank und Datenverzeichnis,
 	 * - "<version>-<n>": owncloud.online encryption 2.x signiert die Position
 	 *   als Zahl (Encryption::end()/encrypt()), der Zusatz "end" fällt weg,
@@ -839,14 +839,14 @@ class Crypt {
 	 * Umschläge ohne Versionsbyte öffnen - so haben die Vorgänger-Apps den
 	 * Dateischlüssel versiegelt:
 	 *
-	 * - encryption <= 1.6.x (ownCloud 10): openssl_seal() ohne Cipher-Argument,
+	 * - encryption <= 1.6.x (Server 10.x): openssl_seal() ohne Cipher-Argument,
 	 *   also RC4 mit 128-Bit-Umschlagschlüssel.
-	 * - encryption 1.7.x (ownCloud 11 von upstream): openssl_seal(..., 'aes-256-ecb')
+	 * - encryption 1.7.x (Upstream-Server 11): openssl_seal(..., 'aes-256-ecb')
 	 *   mit 256-Bit-Umschlagschlüssel.
 	 *
 	 * openssl_open(..., 'RC4') scheitert unter OpenSSL 3 ohne geladenen
 	 * Legacy-Provider ("digital envelope routines::unsupported") - und den laden
-	 * Standardinstallationen nicht. Jede aus ownCloud 10 übernommene
+	 * Standardinstallationen nicht. Jede von einem 10.x-Server übernommene
 	 * verschlüsselte Datei wäre damit unlesbar. Deshalb wird der
 	 * Umschlagschlüssel hier selbst per RSA (PKCS#1 v1.5, wie openssl_seal)
 	 * geöffnet; seine Länge verrät das Verfahren eindeutig, und RC4 wird in PHP
