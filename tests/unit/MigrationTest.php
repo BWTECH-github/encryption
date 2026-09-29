@@ -363,11 +363,24 @@ class MigrationTest extends \Test\TestCase {
 		$query->execute();
 	}
 
+	/**
+	 * installedVersion ist readonly und wird im Konstruktor aus dem App-Wert
+	 * files_encryption/installed_version gelesen. Den Wert nur für den
+	 * Konstruktor setzen und danach wieder entfernen, damit der Datenbankstand
+	 * der Tests unverändert bleibt.
+	 */
+	private function createMigrationWithInstalledVersion(string $version): Migration {
+		$config = \OC::$server->getConfig();
+		$config->setAppValue('files_encryption', 'installed_version', $version);
+		$m = new Migration($config, new \OC\Files\View(), \OC::$server->getDatabaseConnection(), $this->logger);
+		$config->deleteAppValue('files_encryption', 'installed_version');
+		return $m;
+	}
+
 	public function testUpdateDB() {
 		$this->prepareDB();
 
-		$m = new Migration(\OC::$server->getConfig(), new \OC\Files\View(), \OC::$server->getDatabaseConnection(), $this->logger);
-		$this->invokePrivate($m, 'installedVersion', ['0.7']);
+		$m = $this->createMigrationWithInstalledVersion('0.7');
 		$m->updateDB();
 
 		$this->verifyDB('appconfig', 'files_encryption', 0);
@@ -385,8 +398,7 @@ class MigrationTest extends \Test\TestCase {
 		$config->setAppValue('encryption', 'publicShareKeyId', 'wrong_share_id');
 		$config->setUserValue(self::TEST_ENCRYPTION_MIGRATION_USER1, 'encryption', 'recoverKeyEnabled', '9');
 
-		$m = new Migration(\OC::$server->getConfig(), new \OC\Files\View(), \OC::$server->getDatabaseConnection(), $this->logger);
-		$this->invokePrivate($m, 'installedVersion', ['0.7']);
+		$m = $this->createMigrationWithInstalledVersion('0.7');
 		$m->updateDB();
 
 		$this->verifyDB('appconfig', 'files_encryption', 0);
@@ -454,8 +466,7 @@ class MigrationTest extends \Test\TestCase {
 	 */
 	public function testUpdateFileCache() {
 		$this->prepareFileCache();
-		$m = new Migration(\OC::$server->getConfig(), new \OC\Files\View(), \OC::$server->getDatabaseConnection(), $this->logger);
-		$this->invokePrivate($m, 'installedVersion', ['0.7']);
+		$m = $this->createMigrationWithInstalledVersion('0.7');
 		self::invokePrivate($m, 'updateFileCache');
 
 		// check results

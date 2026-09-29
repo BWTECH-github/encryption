@@ -59,7 +59,9 @@ class KeyManager {
 		private readonly ILogger $log,
 		private readonly Util $util
 	) {
-		$this->recoveryKeyId = $this->config->getAppValue(
+		// App-Werte als Zeichenkette lesen: appconfig.configvalue darf NULL sein
+		// (etwa in übernommenen Datenbanken), die Eigenschaften sind string.
+		$this->recoveryKeyId = (string)$this->config->getAppValue(
 			'encryption',
 			'recoveryKeyId'
 		);
@@ -155,6 +157,11 @@ class KeyManager {
 	}
 
 	public function storeKeyPair(string $uid, string $password, array $keyPair): bool {
+		// Nie einen privaten Nutzerschlüssel mit leerem Kennwort ablegen: Er wäre
+		// faktisch ungeschützt (siehe Users\Setup::setupUser()).
+		if ($uid === '' || $password === '') {
+			return false;
+		}
 		// Save Public Key
 		$this->setPublicKey($uid, $keyPair['publicKey']);
 
@@ -229,31 +236,54 @@ class KeyManager {
 	/**
 	 * Decrypt private key and store it
 	 *
-	 * @param string $uid user id
-	 * @param string $passPhrase users password
+	 * Anmeldungen ohne Kennwort reichen null (OAuth2) oder '' (OpenID Connect,
+	 * Apache, Token ohne Kennwort) durch; beides wird gleich behandelt.
+	 * - Master-Key: Die Passphrase kommt aus dem Master-Key, die Anmeldung ist
+	 *   egal (wie upstream).
+	 * - Nutzerschlüssel: Versucht wird das leere Kennwort. Das öffnet nur
+	 *   Schlüssel, die schon mit leerem Kennwort abgelegt wurden (Bestand von
+	 *   10.x mit Apache-/SSO-Anmeldung), sonst sauber false mit Warnung - der
+	 *   private Schlüssel bleibt für diese Sitzung zu.
+	 *
+	 * @param string|null $uid user id
+	 * @param string|null $passPhrase users password, null/'' bei Anmeldung ohne Kennwort
 	 */
-	public function init(string $uid, string $passPhrase): bool {
+	public function init(?string $uid, ?string $passPhrase): bool {
 		$this->session->setStatus(Session::INIT_EXECUTED);
 
+		$uid = $uid ?? '';
+		$passPhrase = $passPhrase ?? '';
+		$passwordlessUserKeyLogin = false;
 		try {
 			if ($this->util->isMasterKeyEnabled()) {
 				$uid = $this->getMasterKeyId();
 				$passPhrase = $this->getMasterKeyPassword();
 				$privateKey = $this->getSystemPrivateKey($uid);
 			} else {
+				if ($uid === '') {
+					return false;
+				}
+				$passwordlessUserKeyLogin = ($passPhrase === '');
 				$privateKey = $this->getPrivateKey($uid);
 			}
 			$privateKey = $this->crypt->decryptPrivateKey($privateKey, $passPhrase, $uid);
 		} catch (PrivateKeyMissingException $e) {
 			return false;
 		} catch (DecryptionFailedException $e) {
+			if ($passwordlessUserKeyLogin) {
+				$this->logPasswordlessLogin($uid);
+			}
 			return false;
 		} catch (\Exception $e) {
-			$this->log->warning(
-				'Could not decrypt the private key from user "' . $uid . '"" during login. ' .
-				'Assume password change on the user back-end. Error message: '
-				. $e->getMessage()
-			);
+			if ($passwordlessUserKeyLogin) {
+				$this->logPasswordlessLogin($uid);
+			} else {
+				$this->log->warning(
+					'Could not decrypt the private key from user "' . $uid . '"" during login. ' .
+					'Assume password change on the user back-end. Error message: '
+					. $e->getMessage()
+				);
+			}
 			return false;
 		}
 
@@ -263,7 +293,22 @@ class KeyManager {
 			return true;
 		}
 
+		if ($passwordlessUserKeyLogin) {
+			$this->logPasswordlessLogin($uid);
+		}
 		return false;
+	}
+
+	/**
+	 * Warnung für eine Anmeldung ohne Kennwort im Nutzerschlüssel-Modus
+	 */
+	private function logPasswordlessLogin(string $uid): void {
+		$this->log->warning(
+			'User "{uid}" logged in without a password (e.g. OAuth2, OpenID Connect or a token without password). '
+			. 'In user-key mode the private key is protected by the login password and stays locked for this session; '
+			. 'encrypted files cannot be read. Use master key encryption for instances with such logins.',
+			['app' => 'encryption', 'uid' => $uid]
+		);
 	}
 
 	/**
@@ -282,7 +327,14 @@ class KeyManager {
 		throw new PrivateKeyMissingException($userId);
 	}
 
-	public function getFileKey(string $path, string $uid): string {
+	/**
+	 * Dateischlüssel entschlüsseln.
+	 *
+	 * @param string|null $uid null oder '' = öffentlicher Zugriff ohne Nutzer
+	 *                         (öffentlicher Link, Kommandozeile, Cron); der Kern
+	 *                         reicht dann null durch (EncryptionWrapper).
+	 */
+	public function getFileKey(string $path, ?string $uid): string {
 		if ($uid === '') {
 			$uid = null;
 		}
@@ -501,7 +553,7 @@ class KeyManager {
 	 *
 	 * @throws PublicKeyMissingException
 	 */
-	public function addSystemKeys(array $accessList, array $publicKeys, string $uid): array {
+	public function addSystemKeys(array $accessList, array $publicKeys, ?string $uid): array {
 		if (!empty($accessList['public'])) {
 			$publicShareKey = $this->getPublicShareKey();
 			if (empty($publicShareKey)) {
@@ -510,7 +562,11 @@ class KeyManager {
 			$publicKeys[$this->getPublicShareKeyId()] = $publicShareKey;
 		}
 
-		if ($this->recoveryKeyExists() &&
+		// Ohne Nutzer (öffentlicher Link, Kommandozeile) gibt es keine
+		// Wiederherstellungs-Einstellung eines Nutzers; upstream fragte mit null
+		// und bekam dieselbe Antwort ("nicht eingeschaltet").
+		if ($uid !== null && $uid !== '' &&
+			$this->recoveryKeyExists() &&
 			$this->util->isRecoveryEnabledForUser($uid)) {
 			$publicKeys[$this->getRecoveryKeyId()] = $this->getRecoveryKey();
 		}
@@ -536,8 +592,9 @@ class KeyManager {
 	 * return master key id
 	 */
 	public function getMasterKeyId(): string {
-		if ($this->config->getAppValue('encryption', 'masterKeyId') !== $this->masterKeyId) {
-			$this->masterKeyId = $this->config->getAppValue('encryption', 'masterKeyId');
+		$masterKeyId = (string)$this->config->getAppValue('encryption', 'masterKeyId');
+		if ($masterKeyId !== $this->masterKeyId) {
+			$this->masterKeyId = $masterKeyId;
 		}
 		return $this->masterKeyId;
 	}
@@ -553,20 +610,20 @@ class KeyManager {
 	 * set publicShareKeyId and masterKeyId if not set
 	 */
 	public function setPublicShareKeyIDAndMasterKeyId(): void {
-		$this->publicShareKeyId = $this->config->getAppValue(
+		$this->publicShareKeyId = (string)$this->config->getAppValue(
 			'encryption',
 			'publicShareKeyId'
 		);
-		if (($this->publicShareKeyId === null) || ($this->publicShareKeyId === '')) {
+		if ($this->publicShareKeyId === '') {
 			$this->publicShareKeyId = 'pubShare_' . \substr(\md5((string)\time()), 0, 8);
 			$this->config->setAppValue('encryption', 'publicShareKeyId', $this->publicShareKeyId);
 		}
 
-		$this->masterKeyId = $this->config->getAppValue(
+		$this->masterKeyId = (string)$this->config->getAppValue(
 			'encryption',
 			'masterKeyId'
 		);
-		if (($this->masterKeyId === null) || ($this->masterKeyId === '')) {
+		if ($this->masterKeyId === '') {
 			$this->masterKeyId = 'master_' . \substr(\md5((string)\time()), 0, 8);
 			$this->config->setAppValue('encryption', 'masterKeyId', $this->masterKeyId);
 		}

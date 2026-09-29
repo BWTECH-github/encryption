@@ -42,10 +42,15 @@ class SetupTest extends TestCase {
 	 * @var Setup
 	 */
 	private $instance;
+	/**
+	 * @var \OCP\ILogger|\PHPUnit\Framework\MockObject\MockObject
+	 */
+	private $logMock;
 
 	protected function setUp(): void {
 		parent::setUp();
 		$logMock = $this->createMock('OCP\ILogger');
+		$this->logMock = $logMock;
 		$userSessionMock = $this->getMockBuilder('OCP\IUserSession')
 			->disableOriginalConstructor()
 			->getMock();
@@ -87,9 +92,10 @@ class SetupTest extends TestCase {
 		if ($hasKeys) {
 			$this->keyManagerMock->expects($this->never())->method('storeKeyPair');
 		} else {
-			$this->cryptMock->expects($this->once())->method('createKeyPair')->willReturn('keyPair');
+			$keyPair = ['publicKey' => 'publicKey', 'privateKey' => 'privateKey'];
+			$this->cryptMock->expects($this->once())->method('createKeyPair')->willReturn($keyPair);
 			$this->keyManagerMock->expects($this->once())->method('storeKeyPair')
-				->with('uid', 'password', 'keyPair')->willReturn(true);
+				->with('uid', 'password', $keyPair)->willReturn(true);
 		}
 
 		$this->assertSame(
@@ -103,5 +109,49 @@ class SetupTest extends TestCase {
 			[true, true],
 			[false, true]
 		];
+	}
+
+	public function dataLoginWithoutPassword() {
+		return [
+			'OAuth2 (null)' => [null],
+			'OpenID Connect, Token ohne Kennwort (leer)' => [''],
+		];
+	}
+
+	/**
+	 * Anmeldung ohne Kennwort (OAuth2, OpenID Connect, Token): kein Schlüsselpaar
+	 * mit leerem Kennwort anlegen. Der private Schlüssel läge sonst faktisch
+	 * ungeschützt da und passte nach der nächsten Web-Anmeldung nicht mehr.
+	 *
+	 * @dataProvider dataLoginWithoutPassword
+	 */
+	public function testSetupUserWithoutPasswordCreatesNoKeyPair($password) {
+		$this->keyManagerMock->expects($this->once())->method('userHasKeys')
+			->with('uid')->willReturn(false);
+		$this->cryptMock->expects($this->never())->method('createKeyPair');
+		$this->keyManagerMock->expects($this->never())->method('storeKeyPair');
+		$this->logMock->expects($this->once())->method('warning');
+
+		$this->assertFalse($this->instance->setupUser('uid', $password));
+	}
+
+	/**
+	 * @dataProvider dataLoginWithoutPassword
+	 */
+	public function testSetupUserWithoutPasswordKeepsExistingKeys($password) {
+		$this->keyManagerMock->expects($this->once())->method('userHasKeys')
+			->with('uid')->willReturn(true);
+		$this->keyManagerMock->expects($this->never())->method('storeKeyPair');
+		$this->logMock->expects($this->never())->method('warning');
+
+		$this->assertTrue($this->instance->setupUser('uid', $password));
+	}
+
+	public function testSetupUserWithoutUid() {
+		$this->keyManagerMock->expects($this->never())->method('userHasKeys');
+		$this->keyManagerMock->expects($this->never())->method('storeKeyPair');
+
+		$this->assertFalse($this->instance->setupUser(null, 'password'));
+		$this->assertFalse($this->instance->setupUser('', 'password'));
 	}
 }

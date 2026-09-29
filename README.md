@@ -82,6 +82,30 @@ veraltet ist. Nur in dieser Betriebsart gibt es den
 Wiederherstellungsschluessel und die persoenlichen Verschluesselungs-
 einstellungen.
 
+**Anmeldung ohne Kennwort (OAuth2, OpenID Connect, Token ohne Kennwort).**
+Solche Anmeldungen liefern der App kein Anmeldekennwort (OAuth2: null, OpenID
+Connect: leer). Im Hauptschlüsselbetrieb spielt das keine Rolle: Der Schlüssel
+wird mit der Passphrase des Hauptschlüssels geöffnet, Lesen und Schreiben per
+OAuth2-Bearer funktionieren. Im Benutzerschlüsselbetrieb gilt ab 2.0.10:
+
+- Die App legt ohne Kennwort **kein** Schlüsselpaar an (upstream tat das mit
+  leerem Kennwort; der private Schlüssel läge damit faktisch ungeschützt da und
+  passte nach der nächsten Anmeldung mit Kennwort nicht mehr). Das Schlüsselpaar
+  entsteht bei der nächsten Anmeldung mit Kennwort. Bis dahin scheitert Schreiben
+  mit „Encryption not ready: Public Key missing for user …“ (HTTP 503).
+- Vorhandene Schlüssel bleiben unverändert. Die App versucht das leere Kennwort;
+  das öffnet nur Schlüssel, die schon mit leerem Kennwort abgelegt wurden (etwa
+  aus 10.x mit Apache-/SSO-Anmeldung). Sonst bleibt der private Schlüssel für
+  diese Sitzung zu, und das Log meldet „User … logged in without a password“.
+- In dieser Sitzung lassen sich verschlüsselte Dateien nicht lesen (HTTP 403)
+  und nicht überschreiben (HTTP 503), jeweils mit „Encryption not ready: Private
+  Key missing …“. Neue Dateien lassen sich schreiben; sie werden mit dem
+  öffentlichen Schlüssel verschlüsselt und sind nach einer Anmeldung mit
+  Kennwort lesbar. Verzeichnislisten (PROPFIND) funktionieren.
+
+Für Instanzen mit OAuth2- oder SSO-Anmeldungen ist deshalb der
+Hauptschlüsselbetrieb die richtige Wahl.
+
 ## Verschluesselung einschalten
 
 Die drei Schritte sind: App aktivieren, Verschluesselung im Kern einschalten,
@@ -379,6 +403,9 @@ wurde, scheitert dann mit „Bad Signature“. Abhilfe ist
 | Nutzer meldet "Dein Passwort fuer Deinen privaten Schluessel stimmt nicht mehr mit Deinem Loginpasswort ueberein." | Passwort wurde ohne Wiederherstellungsschluessel fremd gesetzt | Unter Persoenlich > Verschluesselung "Altes Login Passwort" und "Aktuelles Passwort" eintragen |
 | Download bricht mit Signaturfehler ab | Versionsangabe der Datei passt nicht zum Inhalt, etwa nach einer Ruecksicherung | `occ encryption:fix-encrypted-version <benutzer>` |
 | `MultiKeyDecryptException: multikeydecrypt with share key failed` | Bis 2.0.8: Der Schlüssel wurde mit RC4 versiegelt (Vorgänger-App bis 1.6), OpenSSL 3 führt RC4 nur im Legacy-Provider. Ab 2.0.9 öffnet die App solche Umschläge selbst; bleibt der Fehler, passt der private Schlüssel nicht zum Umschlag (etwa `secret` oder Schlüsselablage nicht mit umgezogen) | App auf mindestens 2.0.9 bringen; sonst `secret` und `files_encryption/` der Altinstanz prüfen |
+| Download über einen öffentlichen Link oder WebDAV mit OAuth2-Bearer endet mit HTTP 500, Log: `… must be of type string, null given` (`getFileKey()`, `setupUser()`, `init()`) | Bis 2.0.9: Die PHP-8.4-Typen nahmen die null nicht an, die der Kern ohne Nutzer bzw. ohne Anmeldekennwort übergibt | App auf mindestens 2.0.10 bringen |
+| OAuth2-Bearer: HTTP 403/503 „Encryption not ready: Private Key missing …“ | Benutzerschlüsselbetrieb: Der private Schlüssel braucht das Anmeldekennwort, das OAuth2/OpenID Connect nicht mitliefert | Hauptschlüsselbetrieb verwenden (siehe „Benutzerschluessel“) |
+| Log: „No encryption key pair created for user …: the login carried no password“, danach HTTP 503 „Public Key missing for user …“ | Erste Anmeldung eines Nutzers ohne Kennwort im Benutzerschlüsselbetrieb | Einmal mit Kennwort anmelden oder Hauptschlüsselbetrieb verwenden |
 | `Can not get secret from ownCloud instance` | `secret` fehlt in `config/config.php` | Wert wiederherstellen; ohne ihn ist der Hauptschluessel nicht zu oeffnen |
 | `Master key is not enabled.` bei `recreate-master-key` | App-Wert `useMasterKey` steht nicht auf `1` | Betriebsart im Panel waehlen oder `config:app:set encryption useMasterKey --value 1` |
 | `hsm.url not set` | HSM-Befehl ohne konfigurierten Dienst aufgerufen | `hsm.url` setzen oder den Befehl nicht verwenden |

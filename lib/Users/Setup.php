@@ -47,11 +47,32 @@ class Setup {
 	}
 
 	/**
-	 * @param string $uid user id
-	 * @param string $password user password
+	 * Schlüsselpaar eines Nutzers anlegen, falls es noch keins gibt.
+	 *
+	 * Der Kern reicht bei Anmeldungen ohne Kennwort null (OAuth2) oder ''
+	 * (OpenID Connect, Apache, Token ohne Kennwort) durch. Upstream legte dann
+	 * ein Schlüsselpaar mit leerem Kennwort an: Der private Schlüssel läge damit
+	 * faktisch ungeschützt im Schlüsselspeicher und ließe sich nach der nächsten
+	 * Web-Anmeldung mit echtem Kennwort nicht mehr öffnen. Ohne Kennwort wird
+	 * deshalb nichts angelegt; das holt die nächste Anmeldung mit Kennwort nach.
+	 *
+	 * @param string|null $uid user id
+	 * @param string|null $password user password, null/'' bei Anmeldung ohne Kennwort
+	 * @return bool true, wenn der Nutzer danach ein Schlüsselpaar hat
 	 */
-	public function setupUser(string $uid, string $password): bool {
+	public function setupUser(?string $uid, ?string $password): bool {
+		if ($uid === null || $uid === '') {
+			return false;
+		}
 		if (!$this->keyManager->userHasKeys($uid)) {
+			if ($password === null || $password === '') {
+				$this->logger->warning(
+					'No encryption key pair created for user "{uid}": the login carried no password (e.g. OAuth2, OpenID Connect or a token without password). '
+					. 'The key pair is created at the next login with password. Use master key encryption for instances with such logins.',
+					['app' => 'encryption', 'uid' => $uid]
+				);
+				return false;
+			}
 			return $this->keyManager->storeKeyPair(
 				$uid,
 				$password,

@@ -51,9 +51,6 @@ class CryptTest extends TestCase {
 		$this->logger = $this->getMockBuilder('OCP\ILogger')
 			->disableOriginalConstructor()
 			->getMock();
-		$this->logger->expects($this->any())
-			->method('warning')
-			->willReturn(true);
 		$this->userSession = $this->getMockBuilder('OCP\IUserSession')
 			->disableOriginalConstructor()
 			->getMock();

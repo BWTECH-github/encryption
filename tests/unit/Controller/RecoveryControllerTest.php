@@ -100,7 +100,7 @@ class RecoveryControllerTest extends TestCase {
 			->method('changeRecoveryKeyPassword')
 			->with($password, $oldPassword)
 			->will($this->returnValueMap([
-				['test', 'oldTestFail', false],
+				['test', 'oldtestFail', false],
 				['test', 'oldtest', true]
 			]));
 

@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [2.0.10] - 2026-09-29
+
+### Fixed
+
+- Öffentliche Links: Der Download einer verschlüsselten Datei über einen öffentlichen Link (mit und ohne Link-Kennwort, `/s/<token>/download`) brach mit HTTP 500 ab („KeyManager::getFileKey(): Argument #2 ($uid) must be of type string, null given“). Ohne angemeldeten Nutzer übergibt der Kern null als uid; das gilt jetzt wieder als öffentlicher Zugriff wie upstream – mit Hauptschlüssel über den Hauptschlüssel, mit Benutzerschlüsseln über den Schlüssel für öffentliche Links. Dasselbe gilt für Kommandozeile und Cron ohne Nutzer sowie für Schlüsselaktualisierungen ohne Sitzung (`update()`, `addSystemKeys()`, `isReadyForUser()`).
+- Anmeldung ohne Kennwort (OAuth2-Bearer, OpenID Connect, Token ohne Kennwort): Sobald die App eingeschaltet war – auch ohne aktive Verschlüsselung –, endete jeder WebDAV-Zugriff mit OAuth2-Bearer in HTTP 500 („Setup::setupUser(): Argument #2 ($password) must be of type string, null given“, mit Hauptschlüssel „KeyManager::init(): Argument #2 ($passPhrase) …“). OAuth2 liefert null, OpenID Connect '' als Kennwort; beides wird jetzt gleich behandelt:
+  - Hauptschlüssel: Der Schlüssel wird wie upstream mit der Passphrase des Hauptschlüssels geöffnet. Lesen und Schreiben per Bearer funktionieren.
+  - Benutzerschlüssel: Ohne Kennwort wird **kein** Schlüsselpaar mehr angelegt. Upstream legte eines mit leerem Kennwort an; der private Schlüssel läge damit faktisch ungeschützt da und passte nach der nächsten Anmeldung mit Kennwort nicht mehr. Das Schlüsselpaar entsteht bei der nächsten Anmeldung mit Kennwort (Warnung im Log). Vorhandene Schlüssel bleiben unverändert; `init()` versucht das leere Kennwort – das öffnet nur Schlüssel, die schon mit leerem Kennwort abgelegt wurden (etwa aus 10.x mit Apache-/SSO-Anmeldung) – und endet sonst sauber mit false und einer Warnung. `KeyManager::storeKeyPair()` lehnt ein leeres Kennwort grundsätzlich ab.
+- `occ encryption:decrypt-all` mit Benutzerschlüsseln: Eine nicht gesetzte Umgebungsvariable `OC_RECOVERY_PASSWORD`/`OC_PASSWORD` (getenv() liefert false) oder eine leere Eingabe an der Kennwortabfrage (null) endet mit „Invalid credentials provided“ statt mit einem TypeError.
+- Persönliche Einstellungen, „Schlüsselkennwort aktualisieren“: Fehlt ein Feld in der Anfrage, antwortet die App mit 400 statt 500.
+- Die App-Werte `recoveryKeyId`, `publicShareKeyId` und `masterKeyId` werden als Zeichenkette gelesen. Ein NULL in `appconfig` (etwa aus einer übernommenen Datenbank) führte sonst beim Aufbau des Schlüsselverwalters zu einem TypeError.
+
+### Changed
+
+- Benutzerschlüssel und OAuth2/OpenID Connect: Bei einer Anmeldung ohne Kennwort bleibt der private Schlüssel für diese Sitzung zu. Lesen einer verschlüsselten Datei per Bearer endet mit HTTP 403, Überschreiben mit HTTP 503 („Encryption not ready: Private Key missing …“, den Code wählt der Kern); neue Dateien lassen sich schreiben, Verzeichnislisten funktionieren. Ein Nutzer ohne Schlüsselpaar kann per Bearer nichts schreiben (HTTP 503 „Public Key missing for user …“), bis er sich einmal mit Kennwort angemeldet hat. Für Instanzen mit OAuth2- oder SSO-Anmeldungen wird der Hauptschlüssel empfohlen; die README beschreibt das im Abschnitt „Benutzerschluessel“ und in der Fehlersuche.
+- Unit-Tests an die PHP-8.4-Typen angepasst: Viele Mocks lieferten Rückgabewerte (true, null, Zeichenkette statt Feld), die die getypten Methoden nicht mehr annehmen, und die Suite lief mit 85 Fehlern. Sie läuft jetzt vollständig grün; neue Tests decken die Fälle ohne Nutzer und ohne Kennwort ab.
+- Keine Datenbankänderung, keine neue Migration.
+
 ## [2.0.9] - 2026-09-26
 
 ### Fixed

@@ -350,20 +350,24 @@ class KeyManagerTest extends TestCase {
 		$this->keyStorageMock->expects($this->once())
 			->method('getFileKey')
 			->with('/', 'fileKey')
-			->willReturn(true);
+			->willReturn('encryptedFileKey');
 
-		$this->assertTrue($this->instance->getEncryptedFileKey('/'));
+		$this->assertSame('encryptedFileKey', $this->instance->getEncryptedFileKey('/'));
 	}
 
+	/**
+	 * $privateKey false = privater Schlüssel nicht verfügbar: für den öffentlichen
+	 * Zugriff liefert decryptPrivateKey() dann false, in der Sitzung steht ''.
+	 */
 	public function dataTestGetFileKey() {
 		return [
-			['user1', false, 'privateKey', true],
+			['user1', false, 'privateKey', 'fileKey'],
 			['user1', false, false, ''],
-			['user1', true, 'privateKey', true],
+			['user1', true, 'privateKey', 'fileKey'],
 			['user1', true, false, ''],
-			[null, false, 'privateKey', true],
+			[null, false, 'privateKey', 'fileKey'],
 			[null, false, false, ''],
-			[null, true, 'privateKey', true],
+			[null, true, 'privateKey', 'fileKey'],
 			[null, true, false, '']
 		];
 	}
@@ -398,7 +402,7 @@ class KeyManagerTest extends TestCase {
 				[$path, 'fileKey', 'OC_DEFAULT_MODULE'],
 				[$path, $expectedUid . '.shareKey', 'OC_DEFAULT_MODULE'],
 			)
-			->willReturnOnConsecutiveCalls(true, true);
+			->willReturnOnConsecutiveCalls('encryptedFileKey', 'shareKey');
 
 		$this->utilMock->expects($this->any())->method('isMasterKeyEnabled')
 			->willReturn($isMasterKeyEnabled);
@@ -406,20 +410,21 @@ class KeyManagerTest extends TestCase {
 		if ($uid === null) {
 			$this->keyStorageMock->expects($this->once())
 				->method('getSystemUserKey')
-				->willReturn(true);
+				->willReturn('encryptedSystemPrivateKey');
 			$this->cryptMock->expects($this->once())
 				->method('decryptPrivateKey')
 				->willReturn($privateKey);
 		} else {
 			$this->keyStorageMock->expects($this->never())
 				->method('getSystemUserKey');
-			$this->sessionMock->expects($this->once())->method('getPrivateKey')->willReturn($privateKey);
+			$this->sessionMock->expects($this->once())->method('getPrivateKey')->willReturn($privateKey ?: '');
 		}
 
 		if ($privateKey) {
 			$this->cryptMock->expects($this->once())
 				->method('multiKeyDecrypt')
-				->willReturn(true);
+				->with('encryptedFileKey', 'shareKey', $privateKey)
+				->willReturn('fileKey');
 		} else {
 			$this->cryptMock->expects($this->never())
 				->method('multiKeyDecrypt');
@@ -508,6 +513,185 @@ class KeyManagerTest extends TestCase {
 		];
 	}
 
+	/**
+	 * Ohne Nutzer (öffentlicher Link, Kommandozeile) gibt es keinen Wiederherstellungs-
+	 * schlüssel eines Nutzers, wohl aber den Schlüssel für öffentliche Links.
+	 */
+	public function testAddSystemKeysWithoutUser() {
+		$this->keyStorageMock->expects($this->any())
+			->method('getSystemUserKey')
+			->willReturnCallback(function ($keyId, $encryptionModuleId) {
+				return $keyId;
+			});
+		$this->utilMock->expects($this->never())->method('isRecoveryEnabledForUser');
+		self::invokePrivate($this->instance, 'publicShareKeyId', ['publicShareKey']);
+		self::invokePrivate($this->instance, 'recoveryKeyId', ['recoveryKey']);
+
+		$result = $this->instance->addSystemKeys(['public' => true], [], null);
+
+		$this->assertSame(['publicShareKey' => 'publicShareKey.publicKey'], $result);
+	}
+
+	public function dataLoginWithoutPassword() {
+		return [
+			'OAuth2 (null)' => [null],
+			'OpenID Connect, Token ohne Kennwort (leer)' => [''],
+		];
+	}
+
+	private function getInitInstance() {
+		return $this->getMockBuilder('OCA\Encryption\KeyManager')
+			->setConstructorArgs(
+				[
+					$this->keyStorageMock,
+					$this->cryptMock,
+					$this->configMock,
+					$this->userMock,
+					$this->sessionMock,
+					$this->logMock,
+					$this->utilMock
+				]
+			)->onlyMethods(['getMasterKeyId', 'getMasterKeyPassword', 'getSystemPrivateKey', 'getPrivateKey'])
+			->getMock();
+	}
+
+	/**
+	 * Master-Key: Die Passphrase kommt aus dem Master-Key, nicht aus der Anmeldung.
+	 * Eine Anmeldung ohne Kennwort (OAuth2-Bearer, OpenID Connect) muss den
+	 * Schlüssel genauso öffnen wie upstream.
+	 *
+	 * @dataProvider dataLoginWithoutPassword
+	 */
+	public function testInitWithMasterKeyWithoutLoginPassword($password) {
+		$instance = $this->getInitInstance();
+		$this->utilMock->expects($this->any())->method('isMasterKeyEnabled')->willReturn(true);
+		$instance->expects($this->any())->method('getMasterKeyId')->willReturn('masterKeyId');
+		$instance->expects($this->any())->method('getMasterKeyPassword')->willReturn('masterKeyPassword');
+		$instance->expects($this->once())->method('getSystemPrivateKey')->with('masterKeyId')->willReturn('privateMasterKey');
+		$instance->expects($this->never())->method('getPrivateKey');
+		$this->cryptMock->expects($this->once())->method('decryptPrivateKey')
+			->with('privateMasterKey', 'masterKeyPassword', 'masterKeyId')
+			->willReturn('key');
+		$this->sessionMock->expects($this->once())->method('setPrivateKey')->with('key');
+
+		$this->assertTrue($instance->init($this->userId, $password));
+	}
+
+	/**
+	 * Nutzerschlüssel, Anmeldung ohne Kennwort, Schlüssel mit echtem Kennwort
+	 * geschützt: sauber false, kein TypeError, eine Warnung.
+	 *
+	 * @dataProvider dataLoginWithoutPassword
+	 */
+	public function testInitWithUserKeysWithoutLoginPasswordFailsCleanly($password) {
+		$instance = $this->getInitInstance();
+		$this->utilMock->expects($this->any())->method('isMasterKeyEnabled')->willReturn(false);
+		$instance->expects($this->once())->method('getPrivateKey')->with($this->userId)->willReturn('privateUserKey');
+		$this->cryptMock->expects($this->once())->method('decryptPrivateKey')
+			->with('privateUserKey', '', $this->userId)
+			->willThrowException(new \OC\HintException('Bad Signature'));
+		$this->sessionMock->expects($this->once())->method('setStatus')->with(Session::INIT_EXECUTED);
+		$this->sessionMock->expects($this->never())->method('setPrivateKey');
+		$this->logMock->expects($this->once())->method('warning');
+
+		$this->assertFalse($instance->init($this->userId, $password));
+	}
+
+	/**
+	 * Bestand von 10.x mit Anmeldung ohne Kennwort (Apache/SSO): Der Schlüssel
+	 * wurde dort mit leerem Kennwort abgelegt und muss weiter aufgehen.
+	 *
+	 * @dataProvider dataLoginWithoutPassword
+	 */
+	public function testInitWithUserKeysWithoutLoginPasswordOpensEmptyPasswordKey($password) {
+		$instance = $this->getInitInstance();
+		$this->utilMock->expects($this->any())->method('isMasterKeyEnabled')->willReturn(false);
+		$instance->expects($this->once())->method('getPrivateKey')->with($this->userId)->willReturn('privateUserKey');
+		$this->cryptMock->expects($this->once())->method('decryptPrivateKey')
+			->with('privateUserKey', '', $this->userId)
+			->willReturn('key');
+		$this->sessionMock->expects($this->once())->method('setPrivateKey')->with('key');
+
+		$this->assertTrue($instance->init($this->userId, $password));
+	}
+
+	public function testInitWithUserKeysWithoutUid() {
+		$instance = $this->getInitInstance();
+		$this->utilMock->expects($this->any())->method('isMasterKeyEnabled')->willReturn(false);
+		$instance->expects($this->never())->method('getPrivateKey');
+		$this->cryptMock->expects($this->never())->method('decryptPrivateKey');
+		$this->sessionMock->expects($this->never())->method('setPrivateKey');
+
+		$this->assertFalse($instance->init(null, 'pass'));
+	}
+
+	/**
+	 * Letzte Sperre: Kein privater Schlüssel eines Nutzers wird mit leerem
+	 * Kennwort abgelegt, egal woher der Aufruf kommt.
+	 */
+	public function testStoreKeyPairRefusesEmptyPassword() {
+		$this->keyStorageMock->expects($this->never())->method('setUserKey');
+		$this->cryptMock->expects($this->never())->method('encryptPrivateKey');
+
+		$this->assertFalse(
+			$this->instance->storeKeyPair($this->userId, '', ['publicKey' => 'pub', 'privateKey' => 'priv'])
+		);
+	}
+
+	/**
+	 * Öffentlicher Link mit Master-Key: Der Kern übergibt null als uid, der
+	 * Dateischlüssel kommt über den Master-Key aus dem System-Schlüsselspeicher.
+	 */
+	public function testGetFileKeyForPublicLinkWithMasterKey() {
+		$path = '/owner/files/foo.txt';
+		$this->invokePrivate($this->instance, 'masterKeyId', ['masterKeyId']);
+		$this->utilMock->expects($this->any())->method('isMasterKeyEnabled')->willReturn(true);
+		$this->configMock->expects($this->any())->method('getSystemValue')->with('secret')->willReturn('secret');
+		$this->keyStorageMock->expects($this->any())->method('getFileKey')
+			->willReturnMap([
+				[$path, 'fileKey', 'OC_DEFAULT_MODULE', 'encryptedFileKey'],
+				[$path, 'masterKeyId.shareKey', 'OC_DEFAULT_MODULE', 'masterShareKey'],
+			]);
+		$this->keyStorageMock->expects($this->once())->method('getSystemUserKey')
+			->with('masterKeyId.privateKey', 'OC_DEFAULT_MODULE')
+			->willReturn('encryptedMasterKey');
+		$this->cryptMock->expects($this->once())->method('decryptPrivateKey')
+			->with('encryptedMasterKey', 'secret', 'masterKeyId')
+			->willReturn('masterKey');
+		$this->sessionMock->expects($this->never())->method('getPrivateKey');
+		$this->cryptMock->expects($this->once())->method('multiKeyDecrypt')
+			->with('encryptedFileKey', 'masterShareKey', 'masterKey')
+			->willReturn('fileKey');
+
+		$this->assertSame('fileKey', $this->instance->getFileKey($path, null));
+	}
+
+	/**
+	 * Öffentlicher Link mit Nutzerschlüsseln: Der Dateischlüssel kommt über den
+	 * Schlüssel für öffentliche Links (pubShare_…), wie upstream.
+	 */
+	public function testGetFileKeyForPublicLinkWithUserKeys() {
+		$path = '/owner/files/foo.txt';
+		$this->utilMock->expects($this->any())->method('isMasterKeyEnabled')->willReturn(false);
+		$this->keyStorageMock->expects($this->any())->method('getFileKey')
+			->willReturnMap([
+				[$path, 'fileKey', 'OC_DEFAULT_MODULE', 'encryptedFileKey'],
+				[$path, 'systemKeyId.shareKey', 'OC_DEFAULT_MODULE', 'pubShareKey'],
+			]);
+		$this->keyStorageMock->expects($this->once())->method('getSystemUserKey')
+			->with('systemKeyId.privateKey', 'OC_DEFAULT_MODULE')
+			->willReturn('encryptedPubSharePrivateKey');
+		$this->cryptMock->expects($this->once())->method('decryptPrivateKey')
+			->with('encryptedPubSharePrivateKey')
+			->willReturn('pubSharePrivateKey');
+		$this->sessionMock->expects($this->never())->method('getPrivateKey');
+		$this->cryptMock->expects($this->once())->method('multiKeyDecrypt')
+			->with('encryptedFileKey', 'pubShareKey', 'pubSharePrivateKey')
+			->willReturn('fileKey');
+
+		$this->assertSame('fileKey', $this->instance->getFileKey($path, null));
+	}
+
 	public function testGetMasterKeyId() {
 		$localConfigMock = $this->createMock('OCP\IConfig');
 		$localConfigMock->expects($this->any())
@@ -547,9 +731,10 @@ class KeyManagerTest extends TestCase {
 			)->setMethods()->getMock();
 		$this->keyStorageMock->expects($this->once())->method('getSystemUserKey')
 			->with('systemKeyId.publicKey', \OCA\Encryption\Crypto\Encryption::ID)
-			->willReturn(true);
+			->willReturn('publicMasterKey');
 
-		$this->assertTrue(
+		$this->assertSame(
+			'publicMasterKey',
 			$instance->getPublicMasterKey()
 		);
 	}
@@ -601,6 +786,9 @@ class KeyManagerTest extends TestCase {
 				]
 			)->setMethods(['getPublicMasterKey', 'setSystemPrivateKey', 'getMasterKeyPassword'])
 			->getMock();
+
+		// validateMasterKey() tut nur im Master-Key-Betrieb etwas
+		$this->utilMock->expects($this->any())->method('isMasterKeyEnabled')->willReturn(true);
 
 		$instance->expects($this->once())->method('getPublicMasterKey')
 			->willReturn($masterKey);

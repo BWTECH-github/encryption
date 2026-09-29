@@ -143,7 +143,7 @@ class EncryptionTest extends TestCase {
 			->will($this->returnCallback([$this, 'addSystemKeysCallback']));
 		$this->cryptMock->expects($this->any())
 			->method('multiKeyEncrypt')
-			->willReturn(true);
+			->willReturn(['data' => 'encryptedFileKey', 'keys' => []]);
 
 		$this->instance->end('/foo/bar');
 	}
@@ -354,6 +354,7 @@ class EncryptionTest extends TestCase {
 				function ($fileKey, $publicKeys) {
 					$this->assertEmpty($publicKeys);
 					$this->assertSame('fileKey', $fileKey);
+					return ['data' => 'encryptedFileKey', 'keys' => []];
 				}
 			);
 
@@ -440,5 +441,68 @@ class EncryptionTest extends TestCase {
 			->with($input, $output, 'user');
 
 		$this->instance->prepareDecryptAll($input, $output, 'user');
+	}
+
+	/**
+	 * Öffentlicher Link: Der Kern kennt keinen Nutzer und reicht null als uid
+	 * durch (EncryptionWrapper::wrapStorage()). Das muss beim Schlüsselverwalter
+	 * als öffentlicher Zugriff ankommen, nicht als TypeError.
+	 */
+	public function testIsReadableForPublicLinkWithoutUser() {
+		$this->keyManagerMock->expects($this->once())
+			->method('getFileKey')
+			->with('/owner/files/foo.txt', null)
+			->willReturn('fileKey');
+
+		$this->assertTrue($this->instance->isReadable('/owner/files/foo.txt', null));
+	}
+
+	public function testIsReadableForPublicLinkWithoutFileKeyThrowsDecryptionFailed() {
+		$this->keyManagerMock->expects($this->once())
+			->method('getFileKey')
+			->with('/owner/files/foo.txt', null)
+			->willReturn('');
+		$this->utilMock->expects($this->once())
+			->method('getOwner')
+			->with('/owner/files/foo.txt')
+			->willReturn('owner');
+
+		$this->expectException(\OC\Encryption\Exceptions\DecryptionFailedException::class);
+		$this->instance->isReadable('/owner/files/foo.txt', null);
+	}
+
+	/**
+	 * Schlüsselaktualisierung ohne angemeldeten Nutzer (Kern-HookManager ohne
+	 * Sitzung, Upload über öffentlichen Link): kein TypeError, die Systemschlüssel
+	 * kommen trotzdem dazu.
+	 */
+	public function testUpdateWithoutUser() {
+		$this->keyManagerMock->expects($this->once())
+			->method('getFileKey')
+			->with('path', null)
+			->willReturn('fileKey');
+		$this->keyManagerMock->expects($this->any())
+			->method('getPublicKey')->willReturn('publicKey');
+		$this->keyManagerMock->expects($this->once())
+			->method('addSystemKeys')
+			->with(['users' => ['user1'], 'public' => true], ['user1' => 'publicKey'], null)
+			->willReturnCallback(function ($accessList, $publicKeys) {
+				$publicKeys['pubShare'] = 'pubShareKey';
+				return $publicKeys;
+			});
+		$this->cryptMock->expects($this->once())
+			->method('multiKeyEncrypt')
+			->with('fileKey', ['user1' => 'publicKey', 'pubShare' => 'pubShareKey'])
+			->willReturn(['data' => 'encryptedFileKey', 'keys' => []]);
+		$this->keyManagerMock->expects($this->once())->method('setAllFileKeys');
+
+		$this->assertTrue($this->instance->update('path', null, ['users' => ['user1'], 'public' => true]));
+	}
+
+	public function testIsReadyForUserWithoutUserInUserKeyMode() {
+		$this->utilMock->expects($this->any())->method('isMasterKeyEnabled')->willReturn(false);
+		$this->keyManagerMock->expects($this->never())->method('userHasKeys');
+
+		$this->assertFalse($this->instance->isReadyForUser(null));
 	}
 }

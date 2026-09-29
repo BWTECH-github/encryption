@@ -340,7 +340,7 @@ class Encryption implements IEncryptionModule {
 	 * update encrypted file, e.g. give additional users access to the file
 	 *
 	 * @param string $path path to the file which should be updated
-	 * @param string $uid of the user who performs the operation
+	 * @param string|null $uid of the user who performs the operation; null/'' ohne Nutzer
 	 * @param array $accessList who has access to the file contains the key 'users' and 'public'
 	 * @return bool|void
 	 */
@@ -456,7 +456,8 @@ class Encryption implements IEncryptionModule {
 	 * e.g. if all encryption keys exists
 	 *
 	 * @param string $path
-	 * @param string $uid user for whom we want to check if he can read the file
+	 * @param string|null $uid user for whom we want to check if he can read the file;
+	 *                         null ohne Nutzer (öffentlicher Link, Kommandozeile)
 	 * @return bool
 	 * @throws DecryptionFailedException
 	 */
@@ -562,6 +563,11 @@ class Encryption implements IEncryptionModule {
 	public function isReadyForUser($user): bool {
 		if ($this->util->isMasterKeyEnabled() === true) {
 			return true;
+		}
+		// Ohne Nutzer gibt es keine Nutzerschlüssel (upstream fragte mit null
+		// den Systemschlüsselpfad ab und bekam ebenfalls false).
+		if ($user === null || $user === '') {
+			return false;
 		}
 		return $this->keyManager->userHasKeys($user);
 	}
