@@ -63,6 +63,10 @@ class SettingsController extends Controller {
 	 * @param string $newPassword
 	 */
 	public function updatePrivateKeyPassword($oldPassword, $newPassword): DataResponse {
+		// Fehlt ein Feld in der Anfrage, kommt null an: als leeres Kennwort
+		// behandeln (400 statt TypeError/500).
+		$oldPassword = (string)$oldPassword;
+		$newPassword = (string)$newPassword;
 		$result = false;
 		$uid = $this->userSession->getUser()->getUID();
 		$errorMessage = $this->l->t('Could not update the private key password.');

@@ -80,6 +80,10 @@ class UserHooks implements IHook {
 	/**
 	 * Startup encryption backend upon user login
 	 *
+	 * Das Kennwort ist bei Anmeldungen ohne Kennwort null (OAuth2) oder ''
+	 * (OpenID Connect, Apache, Token ohne Kennwort); Setup und KeyManager
+	 * behandeln beides gleich.
+	 *
 	 * @note This method should never be called for users using client side encryption
 	 * @return boolean|null|void
 	 */

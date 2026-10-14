@@ -134,20 +134,22 @@ class RecoveryTest extends TestCase {
 	}
 
 	public function testChangeRecoveryKeyPasswordSuccessful() {
-		$this->assertFalse($this->instance->changeRecoveryKeyPassword(
-			'password',
-			'passwordOld'
-		));
-
 		$this->keyManagerMock->expects($this->once())
-			->method('getSystemPrivateKey');
+			->method('getSystemPrivateKey')
+			->willReturn('encryptedRecoveryKey');
 
 		$this->cryptMock->expects($this->once())
-			->method('decryptPrivateKey');
+			->method('decryptPrivateKey')
+			->with('encryptedRecoveryKey', 'passwordOld')
+			->willReturn('recoveryKey');
 
 		$this->cryptMock->expects($this->once())
 			->method('encryptPrivateKey')
-			->willReturn(true);
+			->with('recoveryKey', 'password')
+			->willReturn('newEncryptedRecoveryKey');
+
+		$this->keyManagerMock->expects($this->once())
+			->method('setSystemPrivateKey');
 
 		$this->assertTrue($this->instance->changeRecoveryKeyPassword(
 			'password',
@@ -155,15 +157,39 @@ class RecoveryTest extends TestCase {
 		));
 	}
 
-	public function testChangeRecoveryKeyPasswordCouldNotDecryptPrivateRecoveryKey() {
-		$this->assertFalse($this->instance->changeRecoveryKeyPassword('password', 'passwordOld'));
-
+	/**
+	 * Das neue Kennwort lässt sich nicht anwenden: false, nichts wird geschrieben
+	 */
+	public function testChangeRecoveryKeyPasswordCouldNotEncryptRecoveryKey() {
 		$this->keyManagerMock->expects($this->once())
-			->method('getSystemPrivateKey');
+			->method('getSystemPrivateKey')
+			->willReturn('encryptedRecoveryKey');
+
+		$this->cryptMock->expects($this->once())
+			->method('decryptPrivateKey')
+			->willReturn('recoveryKey');
+
+		$this->cryptMock->expects($this->once())
+			->method('encryptPrivateKey')
+			->willReturn(false);
+
+		$this->keyManagerMock->expects($this->never())
+			->method('setSystemPrivateKey');
+
+		$this->assertFalse($this->instance->changeRecoveryKeyPassword('password', 'passwordOld'));
+	}
+
+	public function testChangeRecoveryKeyPasswordCouldNotDecryptPrivateRecoveryKey() {
+		$this->keyManagerMock->expects($this->once())
+			->method('getSystemPrivateKey')
+			->willReturn('encryptedRecoveryKey');
 
 		$this->cryptMock->expects($this->once())
 			->method('decryptPrivateKey')
 			->will($this->returnValue(false));
+
+		$this->cryptMock->expects($this->never())
+			->method('encryptPrivateKey');
 
 		$this->assertFalse($this->instance->changeRecoveryKeyPassword('password', 'passwordOld'));
 	}
@@ -209,7 +235,8 @@ class RecoveryTest extends TestCase {
 			->willReturn([]);
 
 		$this->cryptMock->expects($this->once())
-			->method('decryptPrivateKey');
+			->method('decryptPrivateKey')
+			->willReturn('recoveryPrivateKey');
 		$this->instance->recoverUsersFiles('password', 'admin');
 		$this->assertTrue(true);
 	}
@@ -217,15 +244,16 @@ class RecoveryTest extends TestCase {
 	public function testRecoverFile() {
 		$this->keyManagerMock->expects($this->once())
 			->method('getEncryptedFileKey')
-			->willReturn(true);
+			->willReturn('encryptedFileKey');
 
 		$this->keyManagerMock->expects($this->once())
 			->method('getShareKey')
-			->willReturn(true);
+			->willReturn('recoveryShareKey');
 
 		$this->cryptMock->expects($this->once())
 			->method('multiKeyDecrypt')
-			->willReturn(true);
+			->with('encryptedFileKey', 'recoveryShareKey', 'testkey')
+			->willReturn('fileKey');
 
 		$this->fileMock->expects($this->once())
 			->method('getAccessList')

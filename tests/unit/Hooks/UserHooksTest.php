@@ -114,6 +114,68 @@ class UserHooksTest extends TestCase {
 		$this->assertNull($this->instance->login($this->params));
 	}
 
+	public function dataLoginWithoutPassword(): array {
+		return [
+			'OAuth2 (null)' => [null],
+			'OpenID Connect, Token ohne Kennwort (leer)' => [''],
+		];
+	}
+
+	private function paramsWithPassword($password): GenericEvent {
+		$userMock = $this->createMock(IUser::class);
+		$userMock->method('getUID')->willReturn('testUser');
+		return new GenericEvent(null, ['uid' => 'testUser', 'password' => $password, 'user' => $userMock]);
+	}
+
+	/**
+	 * OAuth2 liefert null, OpenID Connect '' als Kennwort. Beides muss ohne
+	 * TypeError bei Setup und Schlüsselverwalter ankommen, die dann entscheiden.
+	 *
+	 * @dataProvider dataLoginWithoutPassword
+	 */
+	public function testLoginWithoutPasswordInUserKeyMode($password): void {
+		$this->userSetupMock->expects($this->once())
+			->method('setupUser')
+			->with('testUser', $password)
+			->willReturn(false);
+		$this->keyManagerMock->expects($this->once())
+			->method('init')
+			->with('testUser', $password)
+			->willReturn(false);
+
+		$this->assertNull($this->instance->login($this->paramsWithPassword($password)));
+	}
+
+	/**
+	 * @dataProvider dataLoginWithoutPassword
+	 */
+	public function testLoginWithoutPasswordInMasterKeyMode($password): void {
+		$this->utilMock = $this->createMock(Util::class);
+		$this->utilMock->method('isMasterKeyEnabled')->willReturn(true);
+		$instance = $this->getInstanceMock(['setupFS']);
+
+		$this->userSetupMock->expects($this->never())->method('setupUser');
+		$this->keyManagerMock->expects($this->once())
+			->method('init')
+			->with('testUser', $password)
+			->willReturn(true);
+
+		$this->assertNull($instance->login($this->paramsWithPassword($password)));
+	}
+
+	/**
+	 * @dataProvider dataLoginWithoutPassword
+	 */
+	public function testPostCreateUserWithoutPassword($password): void {
+		$this->userSetupMock->expects($this->once())
+			->method('setupUser')
+			->with('testUser', $password)
+			->willReturn(false);
+
+		$this->instance->postCreateUser($this->paramsWithPassword($password));
+		$this->assertTrue(true);
+	}
+
 	public function testLogout(): void {
 		$this->sessionMock->expects($this->once())
 			->method('clear');
@@ -170,9 +232,10 @@ class UserHooksTest extends TestCase {
 	}
 
 	public function testSetPassphrase(): void {
+		// '' = kein privater Schlüssel in der Sitzung (Session::getPrivateKey() ist string)
 		$this->sessionMock->expects($this->exactly(4))
 			->method('getPrivateKey')
-			->willReturnOnConsecutiveCalls(true, false, false, false);
+			->willReturnOnConsecutiveCalls('privateKey', '', '', '');
 
 		$this->cryptMock->expects($this->exactly(4))
 			->method('encryptPrivateKey')
@@ -195,6 +258,7 @@ class UserHooksTest extends TestCase {
 					$header,
 					'every encrypted file should start with a header'
 				);
+				return true;
 			});
 
 		$this->assertNull($this->instance->setPassphrase($this->params));
@@ -292,7 +356,7 @@ class UserHooksTest extends TestCase {
 	public function testSetPasswordNoUser(): void {
 		$this->sessionMock
 			->method('getPrivateKey')
-			->willReturn(true);
+			->willReturn('privateKey');
 
 		$this->userSessionMock = $this->createMock(IUserSession::class);
 		$this->userSessionMock
@@ -323,7 +387,7 @@ class UserHooksTest extends TestCase {
 			->method('setupUser')
 			->with('testUser', 'password');
 
-		$this->assertNull($this->instance->postPasswordReset($this->params));
+		$this->assertNull($this->instance->postPasswordReset(['uid' => 'testUser', 'password' => 'password']));
 	}
 
 	protected function getInstanceMock($methods) {

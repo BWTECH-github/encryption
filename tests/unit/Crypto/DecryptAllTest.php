@@ -122,7 +122,7 @@ class DecryptAllTest extends TestCase {
 		$input->expects($this->once())
 			->method('hasOption')
 			->with('method')
-			->willReturn($method);
+			->willReturn(true);
 
 		$input->expects($this->any())
 			->method('getOption')
@@ -132,6 +132,85 @@ class DecryptAllTest extends TestCase {
 		$this->envHelper->expects($this->any())
 			->method('getEnvVar')
 			->willReturnOnConsecutiveCalls('', $env, $env);
+
+		$this->instance->prepare($input, $output, 'user1');
+	}
+
+	public function providesMethodWithUnsetEnv() {
+		return [
+			'recovery ohne OC_RECOVERY_PASSWORD' => ['recovery'],
+			'password ohne OC_PASSWORD' => ['password'],
+		];
+	}
+
+	/**
+	 * Nicht gesetzte Umgebungsvariable (getenv() liefert false) ist kein
+	 * Kennwort: LoginException statt TypeError, und das Kennwort wird gar nicht
+	 * erst geprüft.
+	 *
+	 * @dataProvider providesMethodWithUnsetEnv
+	 */
+	public function testPrepareWithEnvNotSetThrowsLoginException($method) {
+		$this->expectException(\OC\User\LoginException::class);
+		$this->expectExceptionMessage('Invalid credentials provided');
+
+		$input = $this->createMock(InputInterface::class);
+		$output = $this->createMock(OutputInterface::class);
+
+		$this->util->expects($this->once())
+			->method('isMasterKeyEnabled')
+			->willReturn(false);
+		$this->util->expects($this->any())
+			->method('isRecoveryEnabledForUser')
+			->willReturn(true);
+		$input->expects($this->once())
+			->method('hasOption')
+			->with('method')
+			->willReturn(true);
+		$input->expects($this->any())
+			->method('getOption')
+			->with('method')
+			->willReturn($method);
+		$this->envHelper->expects($this->any())
+			->method('getEnvVar')
+			->willReturn(false);
+		$this->keyManager->expects($this->never())->method('checkRecoveryPassword');
+		$this->userManager->expects($this->never())->method('checkPassword');
+		$this->crypt->expects($this->never())->method('decryptPrivateKey');
+
+		$this->instance->prepare($input, $output, 'user1');
+	}
+
+	/**
+	 * Leere Eingabe an der Kennwortabfrage: Symfony liefert null. Das ist ein
+	 * leeres Kennwort, kein TypeError.
+	 */
+	public function testPrepareWithEmptyPasswordAnswer() {
+		$this->expectException(\OC\User\LoginException::class);
+		$this->expectExceptionMessage('Invalid credentials provided');
+
+		$input = $this->createMock(InputInterface::class);
+		$output = $this->createMock(OutputInterface::class);
+
+		$this->util->expects($this->once())
+			->method('isMasterKeyEnabled')
+			->willReturn(false);
+		$input->expects($this->once())
+			->method('hasOption')
+			->with('method')
+			->willReturn(true);
+		$input->expects($this->any())
+			->method('getOption')
+			->with('method')
+			->willReturn(null);
+		$this->questionHelper->expects($this->once())
+			->method('ask')
+			->willReturn(null);
+		$this->userManager->expects($this->once())
+			->method('checkPassword')
+			->with('user1', '')
+			->willReturn(false);
+		$this->crypt->expects($this->never())->method('decryptPrivateKey');
 
 		$this->instance->prepare($input, $output, 'user1');
 	}
@@ -279,10 +358,19 @@ class DecryptAllTest extends TestCase {
 		$this->keyManager->expects($this->once())
 			->method('getRecoveryKeyId')
 			->willReturn('user1');
-		if (!$expectedResult) {
+		if ($expectedResult) {
+			$this->crypt->expects($this->once())
+				->method('decryptPrivateKey')
+				->willReturn('masterPrivateKey');
+			$this->session->expects($this->once())
+				->method('prepareDecryptAll')
+				->with('user1', 'masterPrivateKey');
+		} else {
 			$this->crypt->expects($this->once())
 				->method('decryptPrivateKey')
 				->willReturn(false);
+			$this->session->expects($this->never())
+				->method('prepareDecryptAll');
 		}
 
 		$result = $this->instance->prepare($input, $output, 'user1');
@@ -309,7 +397,19 @@ class DecryptAllTest extends TestCase {
 			->method('isMasterKeyEnabled')
 			->willReturn(false);
 
+		// Die Option --method ist im Befehl definiert (hasOption() = true); ohne
+		// Angabe liefert getOption() null.
+		$input->expects($this->once())
+			->method('hasOption')
+			->with('method')
+			->willReturn(true);
+
 		if (!(($expectedResult === false) && ($user === ''))) {
+			// getArgument('user') === '': getOption() wird zweimal gefragt
+			$input->expects($this->any())
+				->method('getArgument')
+				->with('user')
+				->willReturn('');
 			$input->expects($this->exactly(2))
 				->method('getOption')
 				->with('method')
@@ -325,18 +425,21 @@ class DecryptAllTest extends TestCase {
 				->willReturn('foo');
 		}
 
-		if (!$expectedResult && ($user !== '')) {
+		if ($user !== '') {
+			// ein Nutzer über den Wiederherstellungsschlüssel
 			$this->util->expects($this->once())
 				->method('isRecoveryEnabledForUser')
+				->with($user)
 				->willReturn(true);
 
 			$this->keyManager->expects($this->once())
 				->method('checkRecoveryPassword')
+				->with('foo')
 				->willReturn(true);
 
 			$this->keyManager->expects($this->exactly(2))
 				->method('getRecoveryKeyId')
-				->willReturn($user);
+				->willReturn('recoveryKeyId');
 		}
 
 		if (($expectedResult === true) && ($user === '')) {
@@ -348,7 +451,7 @@ class DecryptAllTest extends TestCase {
 		if ($expectedResult === true) {
 			$this->crypt->expects($this->once())
 				->method('decryptPrivateKey')
-				->willReturn(true);
+				->willReturn('recoveryPrivateKey');
 		} else {
 			if (!(($expectedResult === false) && ($user === ''))) {
 				$this->crypt->expects($this->once())
@@ -375,6 +478,12 @@ class DecryptAllTest extends TestCase {
 		$input->expects($this->once())
 			->method('hasOption')
 			->willReturn(true);
+		// getArgument('user') === '': erste Abfrage von --method in der
+		// Prüfung "password für alle Nutzer", die zweite liefert die Methode
+		$input->expects($this->any())
+			->method('getArgument')
+			->with('user')
+			->willReturn('');
 		$input->expects($this->exactly(2))
 			->method('getOption')
 			->with('method')
@@ -388,12 +497,13 @@ class DecryptAllTest extends TestCase {
 
 		$this->userManager->expects($this->once())
 			->method('checkPassword')
+			->with('user1', 'foo')
 			->willReturn(true);
 
 		if ($expectedResult === true) {
 			$this->crypt->expects($this->once())
 				->method('decryptPrivateKey')
-				->willReturn(true);
+				->willReturn('userPrivateKey');
 		} else {
 			$this->crypt->expects($this->once())
 				->method('decryptPrivateKey')
@@ -415,11 +525,12 @@ class DecryptAllTest extends TestCase {
 		$input->expects($this->once())
 			->method('hasOption')
 			->with('method')
-			->willReturn(false);
+			->willReturn(true);
 		$input->expects($this->once())
 			->method('getOption')
 			->with('method')
 			->willReturn('foo');
+		$this->crypt->expects($this->never())->method('decryptPrivateKey');
 
 		$this->assertFalse($this->instance->prepare($input, $output, 'user1'));
 	}

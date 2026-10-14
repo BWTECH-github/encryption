@@ -94,8 +94,11 @@ class SessionTest extends TestCase {
 	 */
 	public function testGetDecryptAllUidException2() {
 		$this->expectException(\Exception::class);
+		$this->expectExceptionMessage('No uid found while in decrypt all mode');
 
-		$this->instance->prepareDecryptAll(null, 'key');
+		// Entschlüsselungsmodus aktiv, aber die uid fehlt in der Sitzung
+		$this->instance->prepareDecryptAll('user', 'key');
+		$this->sessionMock->remove('decryptAllUid');
 		$this->instance->getDecryptAllUid();
 	}
 
@@ -113,8 +116,11 @@ class SessionTest extends TestCase {
 	 */
 	public function testGetDecryptAllKeyException2() {
 		$this->expectException(\OCA\Encryption\Exceptions\PrivateKeyMissingException::class);
+		$this->expectExceptionMessage('No private key found while in decrypt all mode');
 
-		$this->instance->prepareDecryptAll('user', null);
+		// Entschlüsselungsmodus aktiv, aber der Schlüssel fehlt in der Sitzung
+		$this->instance->prepareDecryptAll('user', 'key');
+		$this->sessionMock->remove('decryptAllKey');
 		$this->instance->getDecryptAllKey();
 	}
 

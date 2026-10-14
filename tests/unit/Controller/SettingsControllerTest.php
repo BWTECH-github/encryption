@@ -242,6 +242,32 @@ class SettingsControllerTest extends TestCase {
 		);
 	}
 
+	/**
+	 * Fehlt das alte Schlüsselkennwort in der Anfrage, reicht das Framework null
+	 * durch. Das ist ein falsches altes Kennwort (400), kein TypeError (500).
+	 */
+	public function testUpdatePrivateKeyPasswordWithoutOldPassword() {
+		$this->userManagerMock
+			->expects($this->once())
+			->method('checkPassword')
+			->willReturn(true);
+		$this->keyManagerMock
+			->expects($this->once())
+			->method('getPrivateKey')
+			->willReturn('encryptedKey');
+		$this->cryptMock
+			->expects($this->once())
+			->method('decryptPrivateKey')
+			->with('encryptedKey', '', 'testUserUid')
+			->willReturn(false);
+		$this->keyManagerMock->expects($this->never())->method('setPrivateKey');
+
+		$result = $this->controller->updatePrivateKeyPassword(null, 'new');
+
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $result->getStatus());
+		$this->assertSame('The old password was not correct, please try again.', $result->getData()['message']);
+	}
+
 	public function testSetEncryptHomeStorage() {
 		$value = true;
 		$this->utilMock->expects($this->once())->method('setEncryptHomeStorage')->with($value);

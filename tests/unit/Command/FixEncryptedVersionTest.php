@@ -24,13 +24,20 @@
 namespace OCA\Encryption\Tests\Command;
 
 use OC\Files\Filesystem;
+use OC\Files\Mount\MountPoint;
+use OC\Files\Storage\FailedStorage;
+use OC\Files\Storage\Local;
 use OC\Files\View;
 use OCA\Encryption\Command\FixEncryptedVersion;
 use OCA\Encryption\Crypto\Crypt;
 use OCA\Encryption\KeyManager;
 use OCA\Encryption\Session;
 use OCA\Encryption\Util;
+use OCP\Files\Config\IMountProvider;
 use OCP\Files\IRootFolder;
+use OCP\Files\Storage\IStorageFactory;
+use OCP\Files\StorageNotAvailableException;
+use OCP\IUser;
 use OCP\IUserManager;
 use Symfony\Component\Console\Tester\CommandTester;
 use OCA\Encryption\Users\Setup;
@@ -102,7 +109,7 @@ class FixEncryptedVersionTest extends TestCase {
 		$this->rootFolder = \OC::$server->getRootFolder();
 		$this->userManager = \OC::$server->getUserManager();
 		$this->view = new View("/");
-		$this->fixEncryptedVersion = new FixEncryptedVersion($this->rootFolder, $this->userManager, $this->view);
+		$this->fixEncryptedVersion = new FixEncryptedVersion($this->rootFolder, $this->userManager, $this->view, \OC::$server->getUserSession());
 		$this->commandTester = new CommandTester($this->fixEncryptedVersion);
 	}
 
@@ -371,5 +378,114 @@ The file /test_enc_version_affected_user1/files/foo.txt is: OK", $output);
 		$output = $this->commandTester->getDisplay();
 
 		$this->assertStringContainsString("Please provide a valid path.", $output);
+	}
+
+	/**
+	 * Übernahme per Datenbank: Bekommt eine lokale Einhängung beim Umzug eine
+	 * neue Speicher-ID, legt der Scan ihre Dateien ohne die alte Version neu an
+	 * („Bad Signature“). Der Befehl muss sie auf der Kommandozeile reparieren,
+	 * wo niemand angemeldet ist. Speicher außerhalb des Home-Verzeichnisses
+	 * lesen ihren Besitzer aus der Sitzung (Common::getOwner()); ohne Nutzer
+	 * brach die Schlüsselablage mit NoUserException ab.
+	 */
+	public function testFixesFileOnExternalMountWithoutLoggedInUser(): void {
+		$uid = self::TEST_ENCRYPTION_VERSION_AFFECTED_USER;
+		$dir = \OC::$server->getTempManager()->getTemporaryFolder();
+		\OC::$server->getMountProviderCollection()->registerProvider(new class($uid, $dir) implements IMountProvider {
+			public function __construct(
+				private string $uid,
+				private string $dir,
+			) {
+			}
+
+			public function getMountsForUser(IUser $user, IStorageFactory $loader) {
+				if ($user->getUID() !== $this->uid) {
+					return [];
+				}
+				// jedes Mal eine neue Speicher-Instanz, wie bei einem neuen Aufruf
+				return [new MountPoint(Local::class, '/' . $this->uid . '/files/extern', ['datadir' => $this->dir], $loader)];
+			}
+		});
+		\OC::$server->getUserSession()->login($uid, 'foo');
+		\OC_Util::tearDownFS();
+		\OC_Util::setupFS($uid);
+		$view = new View('/' . $uid . '/files');
+		$view->file_put_contents('daheim.txt', 'im Home-Verzeichnis');
+		$view->file_put_contents('extern/zweimal.txt', 'erste Fassung');
+		$view->file_put_contents('extern/zweimal.txt', 'zweite Fassung');
+		$fileInfo = $view->getFileInfo('extern/zweimal.txt');
+		$version = $fileInfo->getEncryptedVersion();
+		$this->assertGreaterThanOrEqual(2, $version);
+		// so steht die Datei nach einem neuen Scan im Dateicache
+		$fileInfo->getStorage()->getCache()->put($fileInfo->getInternalPath(), ['encryptedVersion' => 0, 'encrypted' => 0]);
+
+		$this->simulateCommandLine();
+
+		$this->commandTester->execute(['user' => $uid, '--path' => 'extern/zweimal.txt']);
+		$output = $this->commandTester->getDisplay();
+
+		$this->assertSame(0, $this->commandTester->getStatusCode());
+		$this->assertStringContainsString("Fixed the file: /$uid/files/extern/zweimal.txt with version $version", $output);
+		$this->assertNull(\OC::$server->getUserSession()->getUser(), 'vorheriger Sitzungszustand wiederhergestellt');
+
+		// Dateien im Home-Verzeichnis bleiben im selben Zustand lesbar (Hauptschlüssel
+		// ohne Sitzungsschlüssel, wie bisher auf der Kommandozeile)
+		$this->simulateCommandLine();
+		$this->commandTester->execute(['user' => $uid, '--path' => 'daheim.txt']);
+		$output = $this->commandTester->getDisplay();
+		$this->assertStringContainsString("The file /$uid/files/daheim.txt is: OK", $output);
+		$this->assertStringNotContainsString('Attempting to fix', $output);
+
+		// zweiter Lauf: nichts mehr zu tun
+		$this->simulateCommandLine();
+		$this->commandTester->execute(['user' => $uid, '--path' => 'extern/zweimal.txt']);
+		$output = $this->commandTester->getDisplay();
+		$this->assertStringContainsString("The file /$uid/files/extern/zweimal.txt is: OK", $output);
+		$this->assertStringNotContainsString('Attempting to fix', $output);
+
+		\OC::$server->getUserSession()->login($uid, 'foo');
+		$this->assertSame('zweite Fassung', (new View('/' . $uid . '/files'))->file_get_contents('extern/zweimal.txt'));
+	}
+
+	/**
+	 * Nach einem Umzug bleiben Einhängungen, deren Backend es nicht mehr gibt,
+	 * als „nicht verfügbar“ stehen. Ein Lauf über alle Dateien eines Nutzers
+	 * überspringt sie, statt abzubrechen.
+	 */
+	public function testSkipsUnavailableStorage(): void {
+		$uid = self::TEST_ENCRYPTION_VERSION_AFFECTED_USER;
+		\OC::$server->getMountProviderCollection()->registerProvider(new class($uid) implements IMountProvider {
+			public function __construct(
+				private string $uid,
+			) {
+			}
+
+			public function getMountsForUser(IUser $user, IStorageFactory $loader) {
+				if ($user->getUID() !== $this->uid) {
+					return [];
+				}
+				return [new MountPoint(FailedStorage::class, '/' . $this->uid . '/files/kaputt', ['exception' => new StorageNotAvailableException('Backend fehlt')], $loader)];
+			}
+		});
+		\OC::$server->getUserSession()->login($uid, 'foo');
+		(new View('/' . $uid . '/files'))->file_put_contents('neben-kaputt.txt', 'bleibt lesbar');
+		$this->simulateCommandLine();
+
+		$this->commandTester->execute(['user' => $uid]);
+		$output = $this->commandTester->getDisplay();
+
+		$this->assertSame(0, $this->commandTester->getStatusCode());
+		$this->assertStringContainsString("Skipping /$uid/files/kaputt: storage not available", $output);
+		$this->assertStringContainsString("The file /$uid/files/neben-kaputt.txt is: OK", $output);
+	}
+
+	/**
+	 * Zustand wie bei occ: niemand angemeldet, kein Schlüssel in der Sitzung
+	 * (den legt sonst die Anmeldung ab), Dateisystem nicht eingerichtet.
+	 */
+	private function simulateCommandLine(): void {
+		\OC::$server->getUserSession()->setUser(null);
+		(new Session(\OC::$server->getSession()))->clear();
+		\OC_Util::tearDownFS();
 	}
 }

@@ -470,10 +470,11 @@ class EncryptAllTest extends TestCase {
 			->method('validateShareKey');
 		$this->keyManager->expects($this->once())
 			->method('validateMasterKey');
+		// Die Schlüssel sind Zeichenketten; "nicht gesetzt" ist die leere Zeichenkette
 		$this->keyManager->method('getPublicShareKey')
-			->willReturn($isShareKeySet);
+			->willReturn($isShareKeySet ? 'publicShareKey' : '');
 		$this->keyManager->method('getPublicMasterKey')
-			->willReturn($isMasterkeySet);
+			->willReturn($isMasterkeySet ? 'publicMasterKey' : '');
 		$returnVal = $this->encryptAll->createMasterKey();
 		$this->assertEquals($expectedResult, $returnVal);
 	}

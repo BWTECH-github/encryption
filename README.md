@@ -82,6 +82,30 @@ veraltet ist. Nur in dieser Betriebsart gibt es den
 Wiederherstellungsschluessel und die persoenlichen Verschluesselungs-
 einstellungen.
 
+**Anmeldung ohne Kennwort (OAuth2, OpenID Connect, Token ohne Kennwort).**
+Solche Anmeldungen liefern der App kein Anmeldekennwort (OAuth2: null, OpenID
+Connect: leer). Im Hauptschlüsselbetrieb spielt das keine Rolle: Der Schlüssel
+wird mit der Passphrase des Hauptschlüssels geöffnet, Lesen und Schreiben per
+OAuth2-Bearer funktionieren. Im Benutzerschlüsselbetrieb gilt ab 2.0.10:
+
+- Die App legt ohne Kennwort **kein** Schlüsselpaar an (upstream tat das mit
+  leerem Kennwort; der private Schlüssel läge damit faktisch ungeschützt da und
+  passte nach der nächsten Anmeldung mit Kennwort nicht mehr). Das Schlüsselpaar
+  entsteht bei der nächsten Anmeldung mit Kennwort. Bis dahin scheitert Schreiben
+  mit „Encryption not ready: Public Key missing for user …“ (HTTP 503).
+- Vorhandene Schlüssel bleiben unverändert. Die App versucht das leere Kennwort;
+  das öffnet nur Schlüssel, die schon mit leerem Kennwort abgelegt wurden (etwa
+  aus 10.x mit Apache-/SSO-Anmeldung). Sonst bleibt der private Schlüssel für
+  diese Sitzung zu, und das Log meldet „User … logged in without a password“.
+- In dieser Sitzung lassen sich verschlüsselte Dateien nicht lesen (HTTP 403)
+  und nicht überschreiben (HTTP 503), jeweils mit „Encryption not ready: Private
+  Key missing …“. Neue Dateien lassen sich schreiben; sie werden mit dem
+  öffentlichen Schlüssel verschlüsselt und sind nach einer Anmeldung mit
+  Kennwort lesbar. Verzeichnislisten (PROPFIND) funktionieren.
+
+Für Instanzen mit OAuth2- oder SSO-Anmeldungen ist deshalb der
+Hauptschlüsselbetrieb die richtige Wahl.
+
 ## Verschluesselung einschalten
 
 Die drei Schritte sind: App aktivieren, Verschluesselung im Kern einschalten,
@@ -299,6 +323,11 @@ angegebenen Obergrenze hinauf, und stellt den Ausgangswert wieder her, wenn
 keine Version passt. Freigegebene Dateien muessen beim Eigentuemer repariert
 werden.
 
+Ab 2.0.9 läuft der Befehl als der angegebene Benutzer. Dadurch erreicht er auch
+Dateien auf lokalen und externen Einhängungen, deren Speicher den Besitzer aus
+der Sitzung lesen. Nicht verfügbare Einhängungen überspringt er mit
+„Skipping … storage not available“.
+
 | Argument / Option        | Vorgabe        | Bedeutung                          |
 |--------------------------|----------------|------------------------------------|
 | `user` (Argument)        | –              | Benutzerkennung, erforderlich      |
@@ -334,6 +363,38 @@ Fehlersuche. Erfordert ebenfalls `hsm.url`.
 | `--username`        | Benutzer, dessen Schluessel gilt; fragt das Passwort ab |
 | `--keyId`           | Kennung des zu verwendenden Schluessels                |
 
+## Umzug von einem Server der Version 10.x
+
+Zieht eine Instanz per Datenbank und Datenverzeichnis um, liest die App den
+verschlüsselten Bestand der Vorgänger-App weiter, ohne ihn umzuschreiben:
+
+- Dateischlüssel, die encryption bis 1.6 mit RC4 und encryption 1.7 mit
+  AES-256-ECB versiegelt hat, öffnet die App ab 2.0.9 selbst – der
+  OpenSSL-Legacy-Provider ist dafür nicht nötig.
+- Letzte Blöcke, deren Signatur die Position mit dem Zusatz „end“ enthält,
+  bestehen die Signaturprüfung.
+
+Voraussetzung ist die unveränderte `config.php` der Altinstanz: `secret` ist das
+Kennwort des Hauptschlüssels, und `instanceid` und `secret` gehen in den Schutz
+der privaten Schlüssel ein. Die Schlüsselablage `files_encryption/` zieht mit dem
+Datenverzeichnis um, ebenso ein eigener Ablageort, falls
+`core/encryption_key_storage_root` gesetzt ist.
+
+**Kein Rückweg auf 10.x.** Was nach dem Umzug geschrieben oder neu geteilt
+wird, bekommt einen Umschlag im Format v2 (AES-256-CBC mit IV) und einen
+letzten Block, dessen Signatur die Position ohne „end“ enthält. Beides kann die
+Vorgänger-App nicht lesen. Zurück geht es nur über die Sicherung von Datenbank
+und Datenverzeichnis von vor dem Umzug; was danach geschrieben wurde, fehlt
+dort.
+
+**Speicher-ID nicht ändern.** Die Version, mit der jeder Block signiert ist,
+steht nur im Dateicache (`filecache.encrypted`). Bekommt ein Speicher eine neue
+ID – etwa eine lokale Einhängung, deren Pfad beim Umzug angepasst wird, ohne
+auch ihre Zeile in `storages` umzuschreiben –, legt der nächste Scan die
+Dateien mit Version 1 neu an. Jede Datei, die öfter als einmal geschrieben
+wurde, scheitert dann mit „Bad Signature“. Abhilfe ist
+`occ encryption:fix-encrypted-version <benutzer> -p <pfad>` (siehe oben).
+
 ## Fehlersuche
 
 | Symptom | Ursache | Abhilfe |
@@ -341,7 +402,10 @@ Fehlersuche. Erfordert ebenfalls `hsm.url`.
 | Panel meldet "Die Verschluesselung-App ist aktiviert, aber Deine Schluessel sind nicht initialisiert." | Die Schluessel wurden in dieser Sitzung nicht initialisiert | Abmelden und neu anmelden |
 | Nutzer meldet "Dein Passwort fuer Deinen privaten Schluessel stimmt nicht mehr mit Deinem Loginpasswort ueberein." | Passwort wurde ohne Wiederherstellungsschluessel fremd gesetzt | Unter Persoenlich > Verschluesselung "Altes Login Passwort" und "Aktuelles Passwort" eintragen |
 | Download bricht mit Signaturfehler ab | Versionsangabe der Datei passt nicht zum Inhalt, etwa nach einer Ruecksicherung | `occ encryption:fix-encrypted-version <benutzer>` |
-| `MultiKeyDecryptException: multikeydecrypt with share key failed` | Der Schluessel wurde mit RC4 versiegelt, OpenSSL 3 fuehrt RC4 nur im Legacy-Provider | Legacy-Provider in der OpenSSL-Konfiguration bereitstellen oder die Dateien mit `encryption:recreate-master-key` neu verschluesseln |
+| `MultiKeyDecryptException: multikeydecrypt with share key failed` | Bis 2.0.8: Der Schlüssel wurde mit RC4 versiegelt (Vorgänger-App bis 1.6), OpenSSL 3 führt RC4 nur im Legacy-Provider. Ab 2.0.9 öffnet die App solche Umschläge selbst; bleibt der Fehler, passt der private Schlüssel nicht zum Umschlag (etwa `secret` oder Schlüsselablage nicht mit umgezogen) | App auf mindestens 2.0.9 bringen; sonst `secret` und `files_encryption/` der Altinstanz prüfen |
+| Download über einen öffentlichen Link oder WebDAV mit OAuth2-Bearer endet mit HTTP 500, Log: `… must be of type string, null given` (`getFileKey()`, `setupUser()`, `init()`) | Bis 2.0.9: Die PHP-8.4-Typen nahmen die null nicht an, die der Kern ohne Nutzer bzw. ohne Anmeldekennwort übergibt | App auf mindestens 2.0.10 bringen |
+| OAuth2-Bearer: HTTP 403/503 „Encryption not ready: Private Key missing …“ | Benutzerschlüsselbetrieb: Der private Schlüssel braucht das Anmeldekennwort, das OAuth2/OpenID Connect nicht mitliefert | Hauptschlüsselbetrieb verwenden (siehe „Benutzerschluessel“) |
+| Log: „No encryption key pair created for user …: the login carried no password“, danach HTTP 503 „Public Key missing for user …“ | Erste Anmeldung eines Nutzers ohne Kennwort im Benutzerschlüsselbetrieb | Einmal mit Kennwort anmelden oder Hauptschlüsselbetrieb verwenden |
 | `Can not get secret from ownCloud instance` | `secret` fehlt in `config/config.php` | Wert wiederherstellen; ohne ihn ist der Hauptschluessel nicht zu oeffnen |
 | `Master key is not enabled.` bei `recreate-master-key` | App-Wert `useMasterKey` steht nicht auf `1` | Betriebsart im Panel waehlen oder `config:app:set encryption useMasterKey --value 1` |
 | `hsm.url not set` | HSM-Befehl ohne konfigurierten Dienst aufgerufen | `hsm.url` setzen oder den Befehl nicht verwenden |

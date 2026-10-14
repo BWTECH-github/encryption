@@ -97,13 +97,17 @@ class DecryptAll {
 				$output->writeln('A method must be supplied when decrypting from user-key state');
 				return false;
 			}
+			// Nicht gesetzte Umgebungsvariablen liefern false (getenv()), eine leere
+			// Eingabe an der Kennwortabfrage null: beides ist ein leeres Kennwort.
+			// Vorher lief false/null bis checkRecoveryPassword()/getPrivateKey()
+			// durch und endete in einem TypeError statt einer LoginException.
 			if (empty($user)) {
 				// all users, so only recovery is possible
 				if ($method === 'recovery' &&
-					(($this->environmentHelper->getEnvVar('OC_RECOVERY_PASSWORD') !== ''))) {
+					(((string)$this->environmentHelper->getEnvVar('OC_RECOVERY_PASSWORD') !== ''))) {
 					// Then we can attempt to use this for all of the users
 					$output->writeln('Attempting to use recovery key from environment for all users. Users must have enabled recovery keys for this to work.');
-					$password = $this->environmentHelper->getEnvVar('OC_RECOVERY_PASSWORD');
+					$password = (string)$this->environmentHelper->getEnvVar('OC_RECOVERY_PASSWORD');
 				} else {
 					$output->writeLn('Recovery key is the only supported method for decrypting all users in one command. The key is read from OC_RECOVERY_PASSWORD.');
 					return false;
@@ -111,14 +115,14 @@ class DecryptAll {
 			} else {
 				// Specific user, password is an option here
 				if ($method === 'recovery' &&
-					($this->environmentHelper->getEnvVar('OC_RECOVERY_PASSWORD') !== '')) {
+					((string)$this->environmentHelper->getEnvVar('OC_RECOVERY_PASSWORD') !== '')) {
 					if ($this->util->isRecoveryEnabledForUser($user) === false) {
 						$output->writeln('Password recovery is not enabled for ' . $user);
 						return false;
 					}
 					// Then we can attempt to use this for all of the users
 					$output->writeln('Attempting to use recovery key from environment: OC_RECOVERY_PASSWORD');
-					$password = $this->environmentHelper->getEnvVar('OC_RECOVERY_PASSWORD');
+					$password = (string)$this->environmentHelper->getEnvVar('OC_RECOVERY_PASSWORD');
 
 					try {
 						if ($this->keyManager->checkRecoveryPassword($password) === false) {
@@ -130,10 +134,10 @@ class DecryptAll {
 
 					$recoveryKeyId = $this->keyManager->getRecoveryKeyId();
 					$user = $recoveryKeyId;
-				} elseif ($method === 'password' && ($this->environmentHelper->getEnvVar('OC_PASSWORD') !== '')) {
+				} elseif ($method === 'password' && ((string)$this->environmentHelper->getEnvVar('OC_PASSWORD') !== '')) {
 					$output->writeln('Attempting to use users password from environment: OC_PASSWORD');
 					// Then we want to use the users password and it has been supplied
-					$password = $this->environmentHelper->getEnvVar('OC_PASSWORD');
+					$password = (string)$this->environmentHelper->getEnvVar('OC_PASSWORD');
 
 					if ($this->userManager->checkPassword($user, $password) === false) {
 						$throwLoginException = true;
@@ -143,7 +147,7 @@ class DecryptAll {
 					$question = new Question('Please enter the login password for user: ' . $user);
 					$question->setHidden(true);
 					$question->setHiddenFallback(false);
-					$password = $this->questionHelper->ask($input, $output, $question);
+					$password = (string)$this->questionHelper->ask($input, $output, $question);
 
 					if ($this->userManager->checkPassword($user, $password) === false) {
 						throw new LoginException('Invalid credentials provided');

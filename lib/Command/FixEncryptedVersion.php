@@ -29,7 +29,9 @@ namespace OCA\Encryption\Command;
 use OC\Files\View;
 use OC\HintException;
 use OCP\Files\IRootFolder;
+use OCP\Files\StorageNotAvailableException;
 use OCP\IUserManager;
+use OCP\IUserSession;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -39,7 +41,8 @@ class FixEncryptedVersion extends Command {
 	public function __construct(
 		private readonly IRootFolder $rootFolder,
 		private readonly IUserManager $userManager,
-		private readonly View $view
+		private readonly View $view,
+		private readonly IUserSession $userSession
 	) {
 		parent::__construct();
 	}
@@ -102,7 +105,30 @@ class FixEncryptedVersion extends Command {
 	 * @return int 0 for success, 1 for error
 	 */
 	private function walkPathOfUser(string $user, string $path, OutputInterface $output, int $incrRange): int {
+		// Das Dateisystem wird ohne angemeldeten Nutzer eingerichtet: Der
+		// Verschlüsselungs-Wrapper merkt sich beim Einrichten den Sitzungsnutzer.
+		// Ohne ihn öffnet das Modul den Hauptschlüssel selbst; mit ihm erwartet
+		// es den Schlüssel, den erst eine Anmeldung in die Sitzung legt - und
+		// den gibt es auf der Kommandozeile nicht.
 		$this->setupUserFs($user);
+		// Danach als der angegebene Nutzer weiterarbeiten: Speicher außerhalb des
+		// Home-Verzeichnisses (lokale und externe Einhängungen) lesen ihren
+		// Besitzer erst beim Zugriff aus der Sitzung (Common::getOwner()), und
+		// die Schlüsselablage bricht ohne Besitzer mit NoUserException ab.
+		$previousUser = $this->userSession->getUser();
+		$this->userSession->setUser($this->userManager->get($user));
+		try {
+			return $this->walkPath($path, $output, $incrRange);
+		} finally {
+			$this->userSession->setUser($previousUser);
+		}
+	}
+
+	/**
+	 * @param int $incrRange Range of versions to try (upper/lower bound)
+	 * @return int 0 for success, 1 for error
+	 */
+	private function walkPath(string $path, OutputInterface $output, int $incrRange): int {
 		if (!$this->view->file_exists($path)) {
 			$output->writeln("<error>Path $path does not exist. Please provide a valid path.</error>");
 			return 1;
@@ -116,10 +142,23 @@ class FixEncryptedVersion extends Command {
 		$directories = [];
 		$directories[] = $path;
 		while ($root = \array_pop($directories)) {
-			$directoryContent = $this->view->getDirectoryContent($root);
+			try {
+				$directoryContent = $this->view->getDirectoryContent($root);
+			} catch (StorageNotAvailableException $e) {
+				$output->writeln("<comment>Skipping $root: storage not available</comment>");
+				continue;
+			}
 			foreach ($directoryContent as $file) {
 				$path = $root . '/' . $file['name'];
-				if ($this->view->is_dir($path)) {
+				// Einhängungen ohne Backend (etwa nach einem Umzug) bleiben als
+				// nicht verfügbar stehen - überspringen statt abbrechen
+				try {
+					$isDir = $this->view->is_dir($path);
+				} catch (StorageNotAvailableException $e) {
+					$output->writeln("<comment>Skipping $path: storage not available</comment>");
+					continue;
+				}
+				if ($isDir) {
 					$directories[] = $path;
 				} else {
 					$output->writeln("Verifying the content of file $path");
@@ -157,6 +196,9 @@ class FixEncryptedVersion extends Command {
 			\fclose($handle);
 
 			return true;
+		} catch (StorageNotAvailableException $e) {
+			$output->writeln("<comment>Skipping $path: storage not available</comment>");
+			return false;
 		} catch (HintException $e) {
 			if (isset($handle) && \is_resource($handle)) {
 				\fclose($handle);
