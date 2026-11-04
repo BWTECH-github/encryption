@@ -69,7 +69,7 @@ PHP 8.4 fork maintained by BW-Tech GmbH for owncloud.online.
 		<admin>admin-encryption</admin>
 	</documentation>
 	<rememberlogin>false</rememberlogin>
-	<version>3.0.0</version>
+	<version>3.0.1</version>
 	<category>security</category>
 	<website>https://owncloud.online</website>
 	<bugs>https://github.com/BWTECH-github/encryption/issues</bugs>
@@ -80,7 +80,7 @@ PHP 8.4 fork maintained by BW-Tech GmbH for owncloud.online.
 	<use-migrations>true</use-migrations>
 	<dependencies>
 		<lib>openssl</lib>
-		<owncloud min-version="10.12" max-version="11"/>
+		<owncloud min-version="11.1" max-version="11.99"/>
 		<php min-version="8.4" />
 	</dependencies>
 	<commands>
