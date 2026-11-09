@@ -18,11 +18,13 @@ login password.
 
 **Before you switch it on**
 
-Switching encryption on is a one-way decision in practice. `occ
-encryption:decrypt-all` reports success but does not touch file versions or the
-trash bin, and `occ encryption:disable` refuses while any encrypted file
-remains. Going back therefore means discarding every file version and emptying
-every trash bin first. Decide before you enable it, not after.
+Plan the way back before you enable it. From owncloud.online 11.0.27 on, `occ
+encryption:decrypt-all` also decrypts file versions and the trash bin, and `occ
+encryption:disable` then switches encryption off. With per-user keys this needs
+each user's login password or the recovery key. Older servers leave file
+versions and the trash bin encrypted, and `occ encryption:disable` refuses while
+any encrypted file remains; there, going back means discarding every file
+version and emptying every trash bin first.
 
 Existing files are not encrypted automatically - run `occ
 encryption:encrypt-all` for that. Keep a backup of the key storage
@@ -32,31 +34,34 @@ encryption:encrypt-all` for that. Keep a backup of the key storage
 
 **Deutsch**
 
-Serverseitige Verschluesselung legt Dateien als Chiffrat auf der Platte ab. Wer
+Serverseitige Verschlüsselung legt Dateien als Chiffrat auf der Platte ab. Wer
 den Speicher lesen kann - ein Hoster, eine entwendete Platte, ein Sicherungsband,
 ein S3-Eimer - sieht AES-256-Chiffrat statt Ihrer Dokumente. Gegen einen
 Angreifer, der den laufenden Server beherrscht, hilft sie nicht, denn dort liegt
-der Schluessel.
+der Schlüssel.
 
 **Wie es arbeitet**
 
-Dateien werden beim Schreiben verschluesselt und beim Lesen entschluesselt.
-Freigaben, Versionen, Papierkorb sowie die Programme fuer Arbeitsplatz und
-Telefon laufen unveraendert weiter; Nutzer merken nichts davon. Zwei Betriebsarten:
-ein Hauptschluessel fuer die ganze Instanz (empfohlen, ohne Zutun der Nutzer)
-oder Schluessel je Konto, abgeleitet aus dem Anmeldepasswort.
+Dateien werden beim Schreiben verschlüsselt und beim Lesen entschlüsselt.
+Freigaben, Versionen, Papierkorb sowie die Programme für Arbeitsplatz und
+Telefon laufen unverändert weiter; Nutzer merken nichts davon. Zwei Betriebsarten:
+ein Hauptschlüssel für die ganze Instanz (empfohlen, ohne Zutun der Nutzer)
+oder Schlüssel je Konto, abgeleitet aus dem Anmeldepasswort.
 
 **Vor dem Einschalten lesen**
 
-Das Einschalten ist praktisch endgueltig. `occ encryption:decrypt-all` meldet
-Erfolg, laesst Dateiversionen und Papierkorb aber verschluesselt liegen, und
-`occ encryption:disable` verweigert, solange noch eine verschluesselte Datei da
-ist. Der Rueckweg bedeutet deshalb: alle Dateiversionen loeschen und alle
-Papierkoerbe leeren. Entscheiden Sie das vorher, nicht hinterher.
+Planen Sie den Rückweg, bevor Sie einschalten. Ab owncloud.online 11.0.27
+entschlüsselt `occ encryption:decrypt-all` auch Dateiversionen und Papierkorb,
+danach schaltet `occ encryption:disable` die Verschlüsselung ab. Mit Schlüsseln
+je Konto braucht das das Anmeldepasswort jedes Nutzers oder den
+Wiederherstellungsschlüssel. Ältere Server lassen Dateiversionen und Papierkorb
+verschlüsselt liegen, und `occ encryption:disable` verweigert, solange noch eine
+verschlüsselte Datei da ist; dort bedeutet der Rückweg: alle Dateiversionen
+löschen und alle Papierkörbe leeren.
 
-Bestandsdateien werden nicht von allein verschluesselt - dafuer gibt es `occ
-encryption:encrypt-all`. Sichern Sie die Schluesselablage
-(`data/files_encryption`): ohne sie sind verschluesselte Dateien endgueltig
+Bestandsdateien werden nicht von allein verschlüsselt - dafür gibt es `occ
+encryption:encrypt-all`. Sichern Sie die Schlüsselablage
+(`data/files_encryption`): ohne sie sind verschlüsselte Dateien endgültig
 verloren.
 
 PHP 8.4 fork maintained by BW-Tech GmbH for owncloud.online.
@@ -69,7 +74,7 @@ PHP 8.4 fork maintained by BW-Tech GmbH for owncloud.online.
 		<admin>admin-encryption</admin>
 	</documentation>
 	<rememberlogin>false</rememberlogin>
-	<version>2.0.10</version>
+	<version>2.0.11</version>
 	<category>security</category>
 	<website>https://owncloud.online</website>
 	<bugs>https://github.com/BWTECH-github/encryption/issues</bugs>
