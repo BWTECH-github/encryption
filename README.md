@@ -170,6 +170,12 @@ fuer einen einzelnen Benutzer; fuer alle Benutzer ist ausschliesslich
 `--method recovery` moeglich, und das Passwort des Wiederherstellungs-
 schluessels wird aus der Umgebungsvariablen `OC_RECOVERY_PASSWORD` gelesen.
 
+Ab owncloud.online 11.0.27 und im Kern 11.1 ab dem Stand vom 10.11.2026
+entschlüsselt der Lauf auch Dateiversionen und Papierkorb; ältere Kerne lassen
+beide verschlüsselt liegen. Meldet
+`decrypt-all` „Nothing to do“, obwohl noch verschlüsselte Dateien da sind,
+zuerst `occ encryption:enable` ausführen und den Lauf wiederholen.
+
 ## Schluesselablage
 
 Die Schluessel liegen im Datenverzeichnis. Wurzel ist standardmaessig das
