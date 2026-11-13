@@ -1,115 +1,87 @@
 <?php
 /** @var array $_ */
 /** @var \OCP\IL10N $l */
+/*
+ * Modified by BW-Tech GmbH on 2026-11-13: eigene Karte nach dem Einstellungs-
+ * Gerüst des Redesigns (div.section, Feldpaare, Hauptknopf der Karte, Gruppen-
+ * titel). Vorher form.sub-section ohne Karte, Abstände über <br>, Inline-
+ * Stile, Kennwortfelder nur mit Platzhalter, Erklärzeilen in <em> und ein
+ * Verweis auf die Dokumentation eines Fremdanbieters.
+ */
 script('encryption', 'settings-admin');
-style('encryption', 'settings-admin');
+$appConfig = \OC::$server->getAppConfig();
+$masterKey = $appConfig->getValue('encryption', 'useMasterKey', '0');
+$userSpecificKey = $appConfig->getValue('encryption', 'userSpecificKey', '');
 ?>
-<form id="ocDefaultEncryptionModule" class="sub-section">
+<div class="section" id="ocDefaultEncryptionModule">
 	<h2 class="app-name"><?php p($l->t('Default encryption module')); ?></h2>
-	<?php if (!$_["initStatus"] and (\OC::$server->getAppConfig()->getValue('encryption', 'useMasterKey', '0') !== '0'
-		or \OC::$server->getAppConfig()->getValue('encryption', 'encryptHomeStorage', '') !== '')): ?>
-		<?php p($l->t("Encryption App is enabled but your keys are not initialized, please log-out and log-in again")); ?>
+	<?php if (!$_["initStatus"] and ($masterKey !== '0' or $appConfig->getValue('encryption', 'encryptHomeStorage', '') !== '')): ?>
+		<p class="warning"><?php p($l->t("Encryption App is enabled but your keys are not initialized, please log-out and log-in again")); ?></p>
 	<?php else: ?>
-		<label id="encryptionType">
-			<?php
-			$masterKey = \OC::$server->getAppConfig()->getValue('encryption', 'useMasterKey', '0');
-		$userSpecificKey = \OC::$server->getAppConfig()->getValue('encryption', 'userSpecificKey', '');
-		if ($masterKey !== '0') {
-			p($l->t("Encryption type: Master Key"));
-		} else {
-			if ($userSpecificKey !== "") {
-				p($l->t("Encryption type: User Specific Key"));
-			}
-		}
-		?>
-		</label>
-		<span id="encryptionKeySelection">
-			<select id="keyTypeId" name="keyType">
-				<option value="nokey"><?php p($l->t("Please select an encryption option"))?></option>
-				<option value="masterkey" <?php \OC::$server->getAppConfig()->getValue('encryption', 'useMasterKey', '0') !== '0' ? print_unescaped('selected="selected"') : print_unescaped(''); ?>><?php p($l->t("Master Key"))?></option>
-			</select>
-			<button id="select-mode" type="button" class="hidden"><?php p($l->t("Permanently select this mode")); ?></button>
-			<div style="display:inline-block;margin-left: 20px;" class="hidden"></div>
-			<div id="masterKeyVal" data-master-key="<?php echo \OC::$server->getAppConfig()->getValue("encryption", "useMasterKey", ""); ?>"></div>
-			<div id="userSpecificKey" data-user-specific-key="<?php echo \OC::$server->getAppConfig()->getValue("encryption", "userSpecificKey", ""); ?>"></div>
-		</span>
-		<br />
-
-		<?php if (\OC::$server->getAppConfig()->getValue("encryption", "userSpecificKey", "") !== ""): ?>
-		<p name="userSpecificKeyWarning" id="userSpecificKeyWarning">
-		<span class="msg warning"><?php print_unescaped($l->t("User Specific Key encryption module is deprecated. See the <a target=\"_blank\" rel=\"noreferrer\" href=\"%s\">server release notes ↗</a> for more information.", ["https://doc.owncloud.com/docs/next/server_release_notes.html#deprecation-note-for-user-key-storage-encryption"]));  ?></span>
-		</p>
-		<br/>
+		<?php if ($masterKey !== '0'): ?>
+		<p id="encryptionType"><?php p($l->t("Encryption type: Master Key")); ?></p>
+		<?php elseif ($userSpecificKey !== ''): ?>
+		<p id="encryptionType"><?php p($l->t("Encryption type: User Specific Key")); ?></p>
+		<p class="warning" id="userSpecificKeyWarning"><?php p($l->t("User Specific Key encryption module is deprecated.")); ?></p>
 		<?php endif; ?>
+		<div id="encryptionKeySelection" data-master-key="<?php p($appConfig->getValue('encryption', 'useMasterKey', '')); ?>" data-user-specific-key="<?php p($userSpecificKey); ?>">
+			<div class="oco-feldpaar">
+				<label for="keyTypeId"><?php p($l->t('Key type')); ?></label>
+				<select id="keyTypeId" name="keyType">
+					<option value="nokey"><?php p($l->t("Please select an encryption option"))?></option>
+					<option value="masterkey"<?php if ($masterKey !== '0') {
+						print_unescaped(' selected="selected"');
+					} ?>><?php p($l->t("Master Key"))?></option>
+				</select>
+			</div>
+			<button id="select-mode" type="button" class="oco-btn-primary hidden"><?php p($l->t("Permanently select this mode")); ?></button>
+		</div>
 
 		<p id="encryptHomeStorageSetting" class="hidden">
 			<input type="checkbox" class="checkbox" name="encrypt_home_storage" id="encryptHomeStorage"
 				   value="1" <?php if ($_['encryptHomeStorage']) {
 				   	print_unescaped('checked="checked"');
 				   } ?> />
-			<label for="encryptHomeStorage"><?php p($l->t('Encrypt the home storage')); ?></label></br>
-			<em><?php p($l->t("Enabling this option encrypts all files stored on the main storage, otherwise only files on external storage will be encrypted")); ?></em>
+			<label for="encryptHomeStorage"><?php p($l->t('Encrypt the home storage')); ?></label>
 		</p>
-		<br />
 		<?php if ($_['masterKeyEnabled'] === false): ?>
-			<p id="encryptionSetRecoveryKey" class="hidden">
-				<?php $_["recoveryEnabled"] === '0' ? p($l->t("Enable recovery key")) : p($l->t("Disable recovery key")); ?>
-				<span class="msg"></span>
-				<br/>
-				<em>
-					<?php p($l->t("The recovery key is an extra encryption key that is used to encrypt files. It allows recovery of a user's files if the user forgets his or her password.")) ?>
-				</em>
-				<br/>
-				<input type="password"
-					   name="encryptionRecoveryPassword"
-					   id="encryptionRecoveryPassword"
-					   aria-label="<?php p($l->t("Recovery key password")); ?>"
-					   placeholder="<?php p($l->t("Recovery key password")); ?>"/>
-				<input type="password"
-					   name="encryptionRecoveryPassword"
-					   id="repeatEncryptionRecoveryPassword"
-					   aria-label="<?php p($l->t("Repeat recovery key password")); ?>"
-					   placeholder="<?php p($l->t("Repeat recovery key password")); ?>"/>
+			<h3 class="oco-gruppentitel hidden" id="encryptionSetRecoveryKeyTitle"><?php p($l->t("Recovery key")); ?></h3>
+			<form id="encryptionSetRecoveryKey" class="encryption-gruppe hidden" novalidate>
+				<div class="oco-feldpaar">
+					<label for="encryptionRecoveryPassword"><?php p($l->t("Recovery key password")); ?></label>
+					<input type="password" name="encryptionRecoveryPassword" id="encryptionRecoveryPassword" autocomplete="new-password" />
+				</div>
+				<div class="oco-feldpaar">
+					<label for="repeatEncryptionRecoveryPassword"><?php p($l->t("Repeat recovery key password")); ?></label>
+					<input type="password" name="encryptionRecoveryPassword" id="repeatEncryptionRecoveryPassword" autocomplete="new-password" />
+				</div>
 				<input type="button"
+					   class="oco-btn-primary"
 					   name="enableRecoveryKey"
 					   id="enableRecoveryKey"
 					   status="<?php p($_["recoveryEnabled"]) ?>"
 					   value="<?php $_["recoveryEnabled"] === '0' ? p($l->t("Enable recovery key")) : p($l->t("Disable recovery key")); ?>"/>
-			</p>
-			<br/><br/>
+				<span class="msg" role="status" aria-live="polite"></span>
+			</form>
 
-			<p name="changeRecoveryPasswordBlock" id="encryptionChangeRecoveryKey" <?php if ($_['recoveryEnabled'] === '0') {
-				print_unescaped('class="hidden"');
-			} ?>>
-				<?php p($l->t("Change recovery key password:")); ?>
-				<span class="msg"></span>
-				<br/>
-				<input
-					type="password"
-					name="changeRecoveryPassword"
-					id="oldEncryptionRecoveryPassword"
-					aria-label="<?php p($l->t("Old recovery key password")); ?>"
-					placeholder="<?php p($l->t("Old recovery key password")); ?>"/>
-				<br />
-				<input
-					type="password"
-					name="changeRecoveryPassword"
-					id="newEncryptionRecoveryPassword"
-					aria-label="<?php p($l->t("New recovery key password")); ?>"
-					placeholder="<?php p($l->t("New recovery key password")); ?>"/>
-				<input
-					type="password"
-					name="changeRecoveryPassword"
-					id="repeatedNewEncryptionRecoveryPassword"
-					aria-label="<?php p($l->t("Repeat new recovery key password")); ?>"
-					placeholder="<?php p($l->t("Repeat new recovery key password")); ?>"/>
-
-				<button
-					type="button"
-					name="submitChangeRecoveryKey">
-					<?php p($l->t("Change Password")); ?>
-				</button>
-			</p>
+			<?php $changeHidden = $_['recoveryEnabled'] === '0' ? ' hidden' : ''; ?>
+			<h3 class="oco-gruppentitel<?php p($changeHidden); ?>" id="encryptionChangeRecoveryKeyTitle"><?php p($l->t("Change recovery key password")); ?></h3>
+			<form id="encryptionChangeRecoveryKey" class="encryption-gruppe<?php p($changeHidden); ?>" novalidate>
+				<div class="oco-feldpaar">
+					<label for="oldEncryptionRecoveryPassword"><?php p($l->t("Old recovery key password")); ?></label>
+					<input type="password" name="changeRecoveryPassword" id="oldEncryptionRecoveryPassword" autocomplete="current-password" />
+				</div>
+				<div class="oco-feldpaar">
+					<label for="newEncryptionRecoveryPassword"><?php p($l->t("New recovery key password")); ?></label>
+					<input type="password" name="changeRecoveryPassword" id="newEncryptionRecoveryPassword" autocomplete="new-password" />
+				</div>
+				<div class="oco-feldpaar">
+					<label for="repeatedNewEncryptionRecoveryPassword"><?php p($l->t("Repeat new recovery key password")); ?></label>
+					<input type="password" name="changeRecoveryPassword" id="repeatedNewEncryptionRecoveryPassword" autocomplete="new-password" />
+				</div>
+				<button type="button" name="submitChangeRecoveryKey"><?php p($l->t("Change Password")); ?></button>
+				<span class="msg" role="status" aria-live="polite"></span>
+			</form>
 		<?php endif; ?>
 	<?php endif; ?>
-</form>
+</div>

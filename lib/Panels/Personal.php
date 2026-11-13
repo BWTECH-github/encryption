@@ -53,7 +53,29 @@ class Personal implements ISettings {
 
 	#[\Override]
 	public function getSectionID(): string {
-		return 'encryption';
+		// Nichts einzustellen: dann hängt das Panel am Profil und liefert dort
+		// nichts (getPanel()). Ein eigener Bereich „Verschlüsselung“ stünde
+		// sonst für jedes Konto leer in der Navigation.
+		return $this->isRelevant() ? 'encryption' : 'general';
+	}
+
+	/**
+	 * Gibt es für das Konto etwas einzustellen? Bei eingeschalteter
+	 * serverseitiger Verschlüsselung immer; sonst nur, wenn das Schlüssel-
+	 * kennwort nicht mehr zum Anmeldekennwort passt - die App registriert ihre
+	 * Hooks über isReady(), nicht über den Schalter (Gegen-Review 23.09.2026).
+	 *
+	 * Der Manager kommt über den Server, nicht über den Konstruktor:
+	 * OCP\Encryption\IManager ist im App-Container nicht registriert, der Kern
+	 * fiele dann auf den Server-Container zurück und könnte das Panel gar nicht
+	 * mehr bauen („Could not resolve OCP\IL10N“, Sektion leer).
+	 */
+	private function isRelevant(): bool {
+		if (\OC::$server->getEncryptionManager()->isEnabled()) {
+			return true;
+		}
+		$session = new \OCA\Encryption\Session($this->session);
+		return $session->getStatus() === \OCA\Encryption\Session::INIT_EXECUTED;
 	}
 
 	/**
@@ -61,18 +83,11 @@ class Personal implements ISettings {
 	 */
 	#[\Override]
 	public function getPanel() {
+		if (!$this->isRelevant()) {
+			return null;
+		}
 		$session = new \OCA\Encryption\Session($this->session);
 		$template = new Template('encryption', 'settings-personal');
-		// App eingeschaltet, serverseitige Verschlüsselung aber nicht: dann
-		// gibt es hier nichts einzustellen. Vorher lief die Vorlage in den
-		// Zweig „Verschlüsselung ist aktiv, Dateien werden transparent
-		// verschlüsselt“ – eine falsche Sicherheitsaussage an Endnutzer
-		// (Befund Server-Abnahme 23.09.2026). Der Manager kommt über den
-		// Server, nicht über den Konstruktor: OCP\Encryption\IManager ist im
-		// App-Container nicht registriert, der Kern fiele dann auf den
-		// Server-Container zurück und könnte das Panel gar nicht mehr bauen
-		// („Could not resolve OCP\IL10N“, Sektion leer).
-		$template->assign('encryptionEnabled', \OC::$server->getEncryptionManager()->isEnabled());
 		$crypt = new \OCA\Encryption\Crypto\Crypt(
 			$this->logger,
 			$this->userSession,

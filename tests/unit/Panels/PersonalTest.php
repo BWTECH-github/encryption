@@ -74,7 +74,39 @@ class PersonalTest extends \Test\TestCase {
 		);
 	}
 
+	public function tearDown(): void {
+		$this->restoreService('EncryptionManager');
+		parent::tearDown();
+	}
+
+	private function encryptionEnabled(bool $enabled): void {
+		$manager = $this->createMock(\OCP\Encryption\IManager::class);
+		$manager->method('isEnabled')->willReturn($enabled);
+		$this->overwriteService('EncryptionManager', $manager);
+	}
+
 	public function testGetSection() {
+		$this->encryptionEnabled(true);
+		$this->assertEquals('encryption', $this->panel->getSectionID());
+	}
+
+	/**
+	 * Ohne eingeschaltete Verschlüsselung und ohne Handlungsbedarf gibt es
+	 * keinen eigenen Bereich und keine Karte.
+	 */
+	public function testNothingToConfigureWithoutEncryption() {
+		$this->encryptionEnabled(false);
+		$this->assertEquals('general', $this->panel->getSectionID());
+		$this->assertNull($this->panel->getPanel());
+	}
+
+	/**
+	 * Passt das Schlüsselkennwort nicht mehr, bleibt der Bereich - auch bei
+	 * ausgeschalteter Verschlüsselung.
+	 */
+	public function testKeyPasswordMismatchWithoutEncryption() {
+		$this->encryptionEnabled(false);
+		$this->session->method('get')->willReturn(\OCA\Encryption\Session::INIT_EXECUTED);
 		$this->assertEquals('encryption', $this->panel->getSectionID());
 	}
 
@@ -83,6 +115,7 @@ class PersonalTest extends \Test\TestCase {
 	}
 
 	public function testGetPanel() {
+		$this->encryptionEnabled(true);
 		$mockUser = $this->getMockBuilder(IUser::class)->getMock();
 		$mockUser->expects($this->once())->method('getUID')->willReturn('testUser');
 		$this->userSession->expects($this->once())->method('getUser')->willReturn($mockUser);

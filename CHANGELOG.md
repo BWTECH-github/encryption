@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## [3.0.2] - 2026-11-13
+
+### Geändert
+- Verwaltung: Karte im Aufbau der Einstellungen (Feldpaare mit Beschriftung, Gruppentitel, Hauptknopf), Schlüsselart übersetzt und beschriftet, Beschriftung des Hauptschlüssels bleibt nach dem Neuladen übersetzt.
+- Persönlich: Der leere Bereich „Verschlüsselung“ erscheint nur noch, wenn es für das Konto etwas einzustellen gibt.
+- Aufgeräumt: tote Zeile in der Kennwort-Mail, alte Stilregeln.
+
 ## [3.0.1] - 2026-11-04
 
 ### Geändert

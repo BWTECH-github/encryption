@@ -20,20 +20,19 @@ $(document).ready(function () {
 			$("#select-mode").removeClass("hidden");
 
 			if(state === "static") {
-				$("#select-mode, #keyTypeId").addClass("hidden");
-				$("#encryptHomeStorage, #encryptionSetRecoveryKey").addClass("hidden");
-				if($("#encryptionType").val().length === 0) {
-					$("#encryptionType").text("Encryption type: Master Key");
-				}
+				// Die Schlüsselart steht fest: Auswahl samt Beschriftung weg, die
+				// Vorlage nennt die Art übersetzt (#encryptionType).
+				$("#encryptionKeySelection").addClass("hidden");
+				$("#encryptHomeStorageSetting, #encryptionSetRecoveryKey, #encryptionSetRecoveryKeyTitle").addClass("hidden");
 			}
 		} else if (encryptionType === "customkey") {
 			//If user selects "User-specific key" from the drop down
 			$("#select-mode").removeClass("hidden");
 
 			if(state === "static") {
-				$("#keyTypeId, #select-mode").addClass("hidden");
+				$("#encryptionKeySelection").addClass("hidden");
 
-				$("#encryptHomeStorageSetting, #encryptionSetRecoveryKey").removeClass("hidden");
+				$("#encryptHomeStorageSetting, #encryptionSetRecoveryKey, #encryptionSetRecoveryKeyTitle").removeClass("hidden");
 
 			}
 		} else {
@@ -43,12 +42,12 @@ $(document).ready(function () {
 
 	}
 
-	$("#encryptionType").css({pointerEvents: "none"});
+	var $keySelection = $("#encryptionKeySelection");
 
 	encryptionTypeSelection($("#keyTypeId :selected").val(), "static");
 
-	if($("#masterKeyVal").attr("data-master-key") === "") {
-		if($("#userSpecificKey").attr("data-user-specific-key") !== "") {
+	if($keySelection.attr("data-master-key") === "") {
+		if($keySelection.attr("data-user-specific-key") !== "") {
 			encryptionTypeSelection("customkey", "static");
 		}
 	}
@@ -59,14 +58,14 @@ $(document).ready(function () {
 
 	$("#select-mode").click(function () {
 		//Action to be taken when "Select this mode" button is selected.
-		var $loadSpinner = $('#encryptionKeySelection').find('div.hidden').first();
-		$loadSpinner.toggleClass('hidden',false);
-		$loadSpinner.toggleClass('loading',true);
+		// Läuft: der Knopf ist gesperrt, bis die Seite neu lädt.
+		var $button = $(this).prop('disabled', true);
 		if($("#keyTypeId :selected").val() === "masterkey") {
 			var masterAjaxObj = OC.AppConfig.setValue('encryption', 'useMasterKey', '1');
 			$.when(masterAjaxObj).done(function (masterKeyObj) {
-				$loadSpinner.toggleClass('hidden');
 				location.reload();
+			}).fail(function () {
+				$button.prop('disabled', false);
 			});
 		}
 	});
@@ -91,15 +90,15 @@ $(document).ready(function () {
 				OC.msg.finishedSuccess('#encryptionSetRecoveryKey .msg', data.data.message);
 
 				if (newRecoveryStatus === 0) {
-					$('p[name="changeRecoveryPasswordBlock"]').addClass("hidden");
-					$('input:button[name="enableRecoveryKey"]').attr('value', 'Enable recovery key');
+					$('#encryptionChangeRecoveryKey, #encryptionChangeRecoveryKeyTitle').addClass("hidden");
+					$('input:button[name="enableRecoveryKey"]').attr('value', t('encryption', 'Enable recovery key'));
 					$('input:button[name="enableRecoveryKey"]').attr('status', '0');
 					$("#encryptionRecoveryPassword").val("");
 					$("#repeatEncryptionRecoveryPassword").val("");
 				} else {
 					$('input:password[name="changeRecoveryPassword"]').val("");
-					$('p[name="changeRecoveryPasswordBlock"]').removeClass("hidden");
-					$('input:button[name="enableRecoveryKey"]').attr('value', 'Disable recovery key');
+					$('#encryptionChangeRecoveryKey, #encryptionChangeRecoveryKeyTitle').removeClass("hidden");
+					$('input:button[name="enableRecoveryKey"]').attr('value', t('encryption', 'Disable recovery key'));
 					$('input:button[name="enableRecoveryKey"]').attr('status', '1');
 				}
 			})

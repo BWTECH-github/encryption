@@ -10,7 +10,8 @@
 	   registriert ihre Hooks über isReady(), nicht über den Schalter - auch bei
 	   ausgeschalteter Verschlüsselung kann ein Nutzer noch verschlüsselte
 	   Dateien und einen nicht mehr passenden Schlüssel haben (Gegen-Review
-	   23.09.2026). Erst danach der Hinweis „nicht eingeschaltet“. */ ?>
+	   23.09.2026). Ohne eingeschaltete Verschlüsselung erscheint das Panel nur
+	   in diesem Fall (Panels\Personal::isRelevant()). */ ?>
 	<?php if ($_["initialized"] === \OCA\Encryption\Session::INIT_EXECUTED): ?>
 		<p>
 			<span class="warning">
@@ -40,11 +41,6 @@
 				disabled><?php p($l->t("Update Private Key Password")); ?>
 			</button>
 			<span class="msg"></span>
-		</p>
-
-	<?php elseif (empty($_["encryptionEnabled"])): ?>
-		<p>
-			<em><?php p($l->t("Server-side encryption is not enabled. There is nothing to configure here.")); ?></em>
 		</p>
 
 	<?php elseif ($_["initialized"] === \OCA\Encryption\Session::NOT_INITIALIZED): ?>

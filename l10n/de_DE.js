@@ -65,6 +65,10 @@ OC.L10N.register(
     "Server-side encryption is active and your files are encrypted transparently. No personal settings are required." : "Die serverseitige Verschlüsselung ist aktiv und Ihre Dateien werden transparent verschlüsselt. Es sind keine persönlichen Einstellungen erforderlich.",
     "Enabling this option will allow you to reobtain access to your encrypted files in case of password loss" : "Durch die Aktivierung dieser Option haben Sie die Möglichkeit, wieder auf Ihre verschlüsselten Dateien zugreifen zu können, wenn Sie Ihr Passwort verloren haben.",
     "Enabled" : "Aktiviert",
-    "Disabled" : "Deaktiviert"
+    "Disabled" : "Deaktiviert",
+    "Key type" : "Schlüsselart",
+    "User Specific Key encryption module is deprecated." : "Das Verschlüsselungsmodul mit benutzerspezifischem Schlüssel ist veraltet.",
+    "Recovery key" : "Wiederherstellungsschlüssel",
+    "Change recovery key password" : "Passwort des Wiederherstellungsschlüssels ändern"
 },
 "nplurals=2; plural=(n != 1);");
